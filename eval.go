@@ -7,11 +7,12 @@ package main
 
 import (
 	"github.com/funnelorg/funnel"
+	"github.com/funnelorg/funnel/math"
 	"github.com/gopherjs/gopherjs/js"
 )
 
 func Eval(code string) interface{} {
-	return funnel.Eval(nil, "browser", code)
+	return funnel.Eval(math.New(), "browser", code)
 }
 
 func main() {

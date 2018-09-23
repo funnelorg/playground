@@ -2359,7 +2359,7 @@ $packages["errors"] = (function() {
 	return $pkg;
 })();
 $packages["math"] = (function() {
-	var $pkg = {}, $init, js, arrayType, arrayType$1, arrayType$2, structType, math, zero, posInf, negInf, nan, buf, Inf, NaN, init, Float32frombits, Float64frombits;
+	var $pkg = {}, $init, js, arrayType, arrayType$1, arrayType$2, structType, math, zero, posInf, negInf, nan, buf, Inf, NaN, Sqrt, init, Float32frombits, Float64frombits;
 	js = $packages["github.com/gopherjs/gopherjs/js"];
 	arrayType = $arrayType($Uint32, 2);
 	arrayType$1 = $arrayType($Float32, 2);
@@ -2378,6 +2378,11 @@ $packages["math"] = (function() {
 		return nan;
 	};
 	$pkg.NaN = NaN;
+	Sqrt = function(x) {
+		var x;
+		return $parseFloat(math.sqrt(x));
+	};
+	$pkg.Sqrt = Sqrt;
 	init = function() {
 		var ab;
 		ab = new ($global.ArrayBuffer)(8);
@@ -11257,18 +11262,116 @@ $packages["github.com/funnelorg/funnel"] = (function() {
 	$pkg.$init = $init;
 	return $pkg;
 })();
+$packages["github.com/funnelorg/funnel/math"] = (function() {
+	var $pkg = {}, $init, errors, parse, run, runtime, math, strconv, sliceType, funcType, ptrType, New, Square, Root;
+	errors = $packages["errors"];
+	parse = $packages["github.com/funnelorg/funnel/parse"];
+	run = $packages["github.com/funnelorg/funnel/run"];
+	runtime = $packages["github.com/funnelorg/funnel/runtime"];
+	math = $packages["math"];
+	strconv = $packages["strconv"];
+	sliceType = $sliceType(parse.Node);
+	funcType = $funcType([run.Scope, sliceType], [$emptyInterface], false);
+	ptrType = $ptrType(parse.Token);
+	New = function() {
+		var _r, m, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; m = $f.m; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		m = $makeMap($emptyInterface.keyFor, [{ k: new $String("square"), v: new funcType(Square) }, { k: new $String("root"), v: new funcType(Root) }]);
+		_r = runtime.NewScope(m, runtime.DefaultScope); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: New }; } $f._r = _r; $f.m = m; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.New = New;
+	Square = function(s, args) {
+		var _r, _ref, _tuple, args, err, f, f$1, f$2, ff, result, s, x, x$1, x$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; _tuple = $f._tuple; args = $f.args; err = $f.err; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; ff = $f.ff; result = $f.result; s = $f.s; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (!((args.$length === 1))) {
+			$s = -1; return errors.New("square: must have exactly 1 arg");
+		}
+		_r = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		result = _r;
+		_ref = result;
+		if ($assertType(_ref, $Float64, true)[1]) {
+			f = _ref.$val;
+			$s = -1; return (x = new runtime.Number.ptr(f * f), new x.constructor.elem(x));
+		} else if ($assertType(_ref, runtime.Number, true)[1]) {
+			f$1 = $clone(_ref.$val, runtime.Number);
+			$s = -1; return (x$1 = new runtime.Number.ptr(f$1.F * f$1.F), new x$1.constructor.elem(x$1));
+		} else if ($assertType(_ref, $error, true)[1]) {
+			f$2 = _ref;
+			if (!((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
+				_tuple = strconv.ParseFloat((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S, 64);
+				ff = _tuple[0];
+				err = _tuple[1];
+				if ($interfaceIsEqual(err, $ifaceNil)) {
+					$s = -1; return (x$2 = new runtime.Number.ptr(ff * ff), new x$2.constructor.elem(x$2));
+				}
+			}
+			$s = -1; return result;
+		}
+		$s = -1; return errors.New("square: not a number");
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Square }; } $f._r = _r; $f._ref = _ref; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.ff = ff; $f.result = result; $f.s = s; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Square = Square;
+	Root = function(s, args) {
+		var _r, _ref, _tuple, args, err, f, f$1, f$2, ff, result, s, x, x$1, x$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; _tuple = $f._tuple; args = $f.args; err = $f.err; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; ff = $f.ff; result = $f.result; s = $f.s; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (!((args.$length === 1))) {
+			$s = -1; return errors.New("root: must have exactly 1 arg");
+		}
+		_r = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		result = _r;
+		_ref = result;
+		if ($assertType(_ref, $Float64, true)[1]) {
+			f = _ref.$val;
+			$s = -1; return (x = new runtime.Number.ptr(math.Sqrt(f)), new x.constructor.elem(x));
+		} else if ($assertType(_ref, runtime.Number, true)[1]) {
+			f$1 = $clone(_ref.$val, runtime.Number);
+			$s = -1; return (x$1 = new runtime.Number.ptr(math.Sqrt(f$1.F)), new x$1.constructor.elem(x$1));
+		} else if ($assertType(_ref, $error, true)[1]) {
+			f$2 = _ref;
+			if (!((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
+				_tuple = strconv.ParseFloat((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S, 64);
+				ff = _tuple[0];
+				err = _tuple[1];
+				if ($interfaceIsEqual(err, $ifaceNil)) {
+					$s = -1; return (x$2 = new runtime.Number.ptr(math.Sqrt(ff)), new x$2.constructor.elem(x$2));
+				}
+			}
+			$s = -1; return result;
+		}
+		$s = -1; return errors.New("root: not a number");
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Root }; } $f._r = _r; $f._ref = _ref; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.ff = ff; $f.result = result; $f.s = s; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Root = Root;
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = errors.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = runtime.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = math.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strconv.$init(); /* */ $s = 6; case 6: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
 $packages["github.com/funnelorg/playground"] = (function() {
-	var $pkg = {}, $init, funnel, js, funcType, mapType, Eval, main;
+	var $pkg = {}, $init, funnel, math, js, funcType, mapType, Eval, main;
 	funnel = $packages["github.com/funnelorg/funnel"];
+	math = $packages["github.com/funnelorg/funnel/math"];
 	js = $packages["github.com/gopherjs/gopherjs/js"];
 	funcType = $funcType([$String], [$emptyInterface], false);
 	mapType = $mapType($String, $emptyInterface);
 	Eval = function(code) {
-		var _r, code, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; code = $f.code; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		_r = funnel.Eval($ifaceNil, "browser", code); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		$s = -1; return _r;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Eval }; } $f._r = _r; $f.code = code; $f.$s = $s; $f.$r = $r; return $f;
+		var _r, _r$1, code, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; code = $f.code; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = math.New(); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_r$1 = funnel.Eval(_r, "browser", code); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		$s = -1; return _r$1;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Eval }; } $f._r = _r; $f._r$1 = _r$1; $f.code = code; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.Eval = Eval;
 	main = function() {
@@ -11278,7 +11381,8 @@ $packages["github.com/funnelorg/playground"] = (function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		$r = funnel.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = js.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = math.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = js.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		if ($pkg === $mainPkg) {
 			main();
 			$mainFinished = true;
