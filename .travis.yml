@@ -1,0 +1,26 @@
+language: go
+go:
+  - 1.11
+
+addons:
+  apt:
+    packages:
+      - nodejs
+
+install:
+  - node --version
+  - go version
+  - go get -u github.com/gopherjs/gopherjs
+  - go get -u github.com/funnelorg/funnel  
+  - npm install source-map-support
+
+script:
+  - diff -u <(echo -n) <(gofmt -d ./)
+  - mv eval.js eval_old.js
+  - gopherjs build -o eval.js
+  
+sudo: false
+notifications:
+  email: false
+
+
