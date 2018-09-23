@@ -11274,12 +11274,14 @@ $packages["github.com/funnelorg/funnel/math"] = (function() {
 	funcType = $funcType([run.Scope, sliceType], [$emptyInterface], false);
 	ptrType = $ptrType(parse.Token);
 	New = function() {
-		var _r, m, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; m = $f.m; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		var _r, _r$1, m, math$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; m = $f.m; math$1 = $f.math$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		m = $makeMap($emptyInterface.keyFor, [{ k: new $String("square"), v: new funcType(Square) }, { k: new $String("root"), v: new funcType(Root) }]);
 		_r = runtime.NewScope(m, runtime.DefaultScope); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		$s = -1; return _r;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: New }; } $f._r = _r; $f.m = m; $f.$s = $s; $f.$r = $r; return $f;
+		math$1 = $makeMap($emptyInterface.keyFor, [{ k: new $String("math"), v: _r }]);
+		_r$1 = runtime.NewScope(math$1, runtime.DefaultScope); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		$s = -1; return _r$1;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: New }; } $f._r = _r; $f._r$1 = _r$1; $f.m = m; $f.math$1 = math$1; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.New = New;
 	Square = function(s, args) {
