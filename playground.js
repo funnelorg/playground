@@ -1,3 +1,7 @@
+// Copyright (C) 2018 Ramesh Vyaghrapuri. All rights reserved.
+// Use of this source code is governed by a MIT-style license
+// that can be found in the LICENSE file.
+
 function init() {
     var snippets = document.querySelectorAll(".snippet");
     for (kk = 0; kk < snippets.length; kk ++) {
