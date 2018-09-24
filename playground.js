@@ -20,7 +20,9 @@ function register(code, button, output) {
         } else {
             text = code.innerText
         }
-        output.textContent = JSON.stringify(Funnel.Eval(text));
+        Funnel.Eval(text, function(result) {
+            output.textContent = JSON.stringify(result)
+        })
     });
 }
 
