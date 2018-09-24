@@ -12,7 +12,11 @@ import (
 )
 
 func Eval(code string) interface{} {
-	return funnel.Eval(math.New(), "browser", code)
+	result := funnel.Eval(math.New(), "browser", code)
+	if err, ok := result.(error); ok {
+		return map[string]interface{}{"Error": err.Error()}
+	}
+	return result
 }
 
 func main() {

@@ -6082,19 +6082,29 @@ $packages["github.com/funnelorg/funnel/math"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/playground"] = (function() {
-	var $pkg = {}, $init, funnel, math, js, funcType, mapType, Eval, main;
+	var $pkg = {}, $init, funnel, math, js, mapType, funcType, Eval, main;
 	funnel = $packages["github.com/funnelorg/funnel"];
 	math = $packages["github.com/funnelorg/funnel/math"];
 	js = $packages["github.com/gopherjs/gopherjs/js"];
-	funcType = $funcType([$String], [$emptyInterface], false);
 	mapType = $mapType($String, $emptyInterface);
+	funcType = $funcType([$String], [$emptyInterface], false);
 	Eval = function(code) {
-		var _r, _r$1, code, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; code = $f.code; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		var _r, _r$1, _r$2, _tuple, code, err, ok, result, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _tuple = $f._tuple; code = $f.code; err = $f.err; ok = $f.ok; result = $f.result; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		_r = math.New(); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 		_r$1 = funnel.Eval(_r, "browser", code); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
-		$s = -1; return _r$1;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Eval }; } $f._r = _r; $f._r$1 = _r$1; $f.code = code; $f.$s = $s; $f.$r = $r; return $f;
+		result = _r$1;
+		_tuple = $assertType(result, $error, true);
+		err = _tuple[0];
+		ok = _tuple[1];
+		/* */ if (ok) { $s = 3; continue; }
+		/* */ $s = 4; continue;
+		/* if (ok) { */ case 3:
+			_r$2 = err.Error(); /* */ $s = 5; case 5: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+			$s = -1; return new mapType($makeMap($String.keyFor, [{ k: "Error", v: new $String(_r$2) }]));
+		/* } */ case 4:
+		$s = -1; return result;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Eval }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tuple = _tuple; $f.code = code; $f.err = err; $f.ok = ok; $f.result = result; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.Eval = Eval;
 	main = function() {
