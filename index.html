@@ -17,11 +17,14 @@
         color: rgb(120, 120, 120);
         width: 100%;
         box-sizing: border-box;
-        padding: 0 5px;
-        min-height: 100px;
+        padding: 5px;
+      }
+      textarea.code {
+        min-height: 70px;
       }
       .wrapper {
         outline: 1px solid rgb(255, 200, 200);
+        margin: 20px 0;
       }
       .output {
         color: red;
@@ -42,7 +45,32 @@
         <button>&#9654; Run</button> <span class="output">Output</span>
       </div>
     </div>
-    <script src="playground.js"></script>
+    <h3> Examples </h3>
+    <div>
+      <p> Funnel expresions can include the standard binary operators: <code>+-/*</code></p>
+      <div class="snippet">
+        <div class="code">5 + 10 * (2 + 5)</div>
+        <div class="wrapper">
+          <button>&#9654; Run</button> <span class="output">Output</span>
+        </div>
+      </div>
+      <p> Funnel also supports multiple expressions: </p>
+      <div class="snippet">
+        <div class="code">{x = 42, y = 23, result = x + y}.result</div>
+        <div class="wrapper">
+          <button>&#9654; Run</button> <span class="output">Output</span>
+        </div>
+      </div>
+      <p> Functions can be define using <code>fun</code>: </p>
+      <div class="snippet">
+        <div class="code">{result = fn(2, 3), fn = fun(a, b, a + b)}.result</div>
+        <div class="wrapper">
+          <button>&#9654; Run</button> <span class="output">Output</span>
+        </div>
+      </div>
+      <p></p>
+      <p> Please see the <a href="https://github.com/funnelorg/funnel">github funnel project</a> for a look at the code
+      <script src="playground.js"></script>
 </script>
 </html>
 
