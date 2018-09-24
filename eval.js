@@ -5513,7 +5513,7 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/runtime"] = (function() {
-	var $pkg = {}, $init, errors, parse, run, strconv, rtscope, empty, invocation, Number, sliceType, funcType, ptrType, sliceType$1, sliceType$2, funcType$1, ptrType$1, mapType, def, x, Dot, Error, Fun, Num, Sum, Function, NewScope, String;
+	var $pkg = {}, $init, errors, parse, run, strconv, rtscope, empty, invocation, Number, sliceType, funcType, ptrType, sliceType$1, sliceType$2, funcType$1, ptrType$1, mapType, def, x, Dot, Error, Fun, Num, Sum, Diff, Multiply, Divide, Function, NewScope, String;
 	errors = $packages["errors"];
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	run = $packages["github.com/funnelorg/funnel/run"];
@@ -5768,6 +5768,108 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: Sum }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.n = n; $f.result = result; $f.s = s; $f.sum = sum; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.Sum = Sum;
+	Diff = function(s, args) {
+		var _i, _r, _ref, _ref$1, args, f, f$1, f$2, f$3, factor, n, result, s, sum, x$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; factor = $f.factor; n = $f.n; result = $f.result; s = $f.s; sum = $f.sum; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		sum = 0;
+		factor = 1;
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			n = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = (new run.Runner.ptr()).Run(s, $clone(n, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			result = _r;
+			_ref$1 = result;
+			if ($assertType(_ref$1, $Float64, true)[1]) {
+				f = _ref$1.$val;
+				sum = sum + (factor * f);
+			} else if ($assertType(_ref$1, Number, true)[1]) {
+				f$1 = $clone(_ref$1.$val, Number);
+				sum = sum + (factor * f$1.F);
+			} else if ($assertType(_ref$1, $error, true)[1]) {
+				f$2 = _ref$1;
+				$s = -1; return result;
+			} else {
+				f$3 = _ref$1;
+				$s = -1; return errors.New("diff: not a number");
+			}
+			factor = -1;
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return (x$1 = new Number.ptr(sum), new x$1.constructor.elem(x$1));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Diff }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.factor = factor; $f.n = n; $f.result = result; $f.s = s; $f.sum = sum; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Diff = Diff;
+	Multiply = function(s, args) {
+		var _i, _r, _ref, _ref$1, args, f, f$1, f$2, f$3, n, product, result, s, x$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; n = $f.n; product = $f.product; result = $f.result; s = $f.s; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		product = 1;
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			n = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = (new run.Runner.ptr()).Run(s, $clone(n, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			result = _r;
+			_ref$1 = result;
+			if ($assertType(_ref$1, $Float64, true)[1]) {
+				f = _ref$1.$val;
+				product = product * f;
+			} else if ($assertType(_ref$1, Number, true)[1]) {
+				f$1 = $clone(_ref$1.$val, Number);
+				product = product * f$1.F;
+			} else if ($assertType(_ref$1, $error, true)[1]) {
+				f$2 = _ref$1;
+				$s = -1; return result;
+			} else {
+				f$3 = _ref$1;
+				$s = -1; return errors.New("mult: not a number");
+			}
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return (x$1 = new Number.ptr(product), new x$1.constructor.elem(x$1));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Multiply }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.n = n; $f.product = product; $f.result = result; $f.s = s; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Multiply = Multiply;
+	Divide = function(s, args) {
+		var _i, _r, _ref, _ref$1, args, f, f$1, f$2, f$3, item, kk, n, product, result, s, x$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; item = $f.item; kk = $f.kk; n = $f.n; product = $f.product; result = $f.result; s = $f.s; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		product = 1;
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			kk = _i;
+			n = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = (new run.Runner.ptr()).Run(s, $clone(n, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			result = _r;
+			item = 1;
+			_ref$1 = result;
+			if ($assertType(_ref$1, $Float64, true)[1]) {
+				f = _ref$1.$val;
+				item = f;
+			} else if ($assertType(_ref$1, Number, true)[1]) {
+				f$1 = $clone(_ref$1.$val, Number);
+				item = f$1.F;
+			} else if ($assertType(_ref$1, $error, true)[1]) {
+				f$2 = _ref$1;
+				$s = -1; return result;
+			} else {
+				f$3 = _ref$1;
+				$s = -1; return errors.New("div: not a number");
+			}
+			if (kk === 0) {
+				product = item;
+			} else {
+				product = product / item;
+			}
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return (x$1 = new Number.ptr(product), new x$1.constructor.elem(x$1));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Divide }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.item = item; $f.kk = kk; $f.n = n; $f.product = product; $f.result = result; $f.s = s; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Divide = Divide;
 	Function = function(fn) {
 		var _tuple, f, fn, ok, r;
 		_tuple = $assertType(fn, funcType, true);
@@ -5865,7 +5967,7 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = strconv.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		def = $makeMap($emptyInterface.keyFor, [{ k: new $String("!"), v: new funcType(Error) }, { k: new $String("."), v: new funcType(Dot) }, { k: new $String("+"), v: new funcType(Sum) }, { k: new $String("builtin:number"), v: new funcType(Num) }, { k: new $String("builtin:string"), v: new funcType(String) }, { k: new $String("fun"), v: new funcType(Fun) }]);
+		def = $makeMap($emptyInterface.keyFor, [{ k: new $String("!"), v: new funcType(Error) }, { k: new $String("."), v: new funcType(Dot) }, { k: new $String("+"), v: new funcType(Sum) }, { k: new $String("-"), v: new funcType(Diff) }, { k: new $String("*"), v: new funcType(Multiply) }, { k: new $String("/"), v: new funcType(Divide) }, { k: new $String("builtin:number"), v: new funcType(Num) }, { k: new $String("builtin:string"), v: new funcType(String) }, { k: new $String("fun"), v: new funcType(Fun) }]);
 		$pkg.DefaultScope = NewScope(def, (x = new empty.ptr(), new x.constructor.elem(x)));
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
