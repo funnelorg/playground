@@ -4915,7 +4915,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 			p.onQuote(kk, rr);
 		} else if (unicode.IsSpace(rr)) {
 			p.flush(kk);
-		} else if (p.isOperator(rr)) {
+		} else if (p.isOperator(rr) && (!((rr === 46)) || (p.digit === -1))) {
 			p.flush(kk);
 			p.sh.Push(new Token.ptr(loc, ($encodeRune(rr))));
 		} else if (unicode.IsDigit(rr)) {
@@ -5095,7 +5095,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 	shunt.ptr.prototype.pushTerm = function(t) {
 		var nn, s, t, term;
 		s = this;
-		term = new Node.ptr(t, ptrType$3.nil, ptrType$4.nil);
+		term = $clone(s.makeNum(new Node.ptr(t, ptrType$3.nil, ptrType$4.nil)), Node);
 		if (s.lastWasTerm()) {
 			nn = new sliceType$1([$clone(s.popTerm(t.Loc), Node), $clone(term, Node)]);
 			s.terms = $append(s.terms, new Node.ptr(ptrType$2.nil, new Call.ptr(t.Loc, nn), ptrType$4.nil));
@@ -5242,7 +5242,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 			if (!((n.Call.Nodes.$length === 3))) {
 				return s.error("invalid equals use", n.Call.Loc);
 			}
-			_tmp = $clone((x = n.Call.Nodes, (1 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 1])), Node);
+			_tmp = $clone(s.makeString($clone((x = n.Call.Nodes, (1 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 1])), Node)), Node);
 			_tmp$1 = $clone((x$1 = n.Call.Nodes, (2 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 2])), Node);
 			key = $clone(_tmp, Node);
 			value = $clone(_tmp$1, Node);
@@ -5260,7 +5260,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 			if (!s.isAssoc($clone(node, Node), "=") || !((node.Call.Nodes.$length === 3))) {
 				return s.error("invalid key=value", $clone(node, Node).Loc());
 			}
-			_tmp$2 = $clone((x$2 = node.Call.Nodes, (1 >= x$2.$length ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + 1])), Node);
+			_tmp$2 = $clone(s.makeString($clone((x$2 = node.Call.Nodes, (1 >= x$2.$length ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + 1])), Node)), Node);
 			_tmp$3 = $clone((x$3 = node.Call.Nodes, (2 >= x$3.$length ? ($throwRuntimeError("index out of range"), undefined) : x$3.$array[x$3.$offset + 2])), Node);
 			key$1 = $clone(_tmp$2, Node);
 			value$1 = $clone(_tmp$3, Node);
@@ -5270,6 +5270,26 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 		return new Node.ptr(ptrType$2.nil, ptrType$3.nil, new Map.ptr($clone(n, Node).Loc(), pairs));
 	};
 	shunt.prototype.makeMap = function(n) { return this.$val.makeMap(n); };
+	shunt.ptr.prototype.makeString = function(n) {
+		var n, nn, s;
+		s = this;
+		if (n.Token === ptrType$2.nil) {
+			return n;
+		}
+		nn = new sliceType$1([new Node.ptr(new Token.ptr($clone(n, Node).Loc(), "builtin:string"), ptrType$3.nil, ptrType$4.nil), $clone(n, Node)]);
+		return new Node.ptr(ptrType$2.nil, new Call.ptr($clone(n, Node).Loc(), nn), ptrType$4.nil);
+	};
+	shunt.prototype.makeString = function(n) { return this.$val.makeString(n); };
+	shunt.ptr.prototype.makeNum = function(n) {
+		var n, nn, s, x;
+		s = this;
+		if (n.Token === ptrType$2.nil || n.Token.S === "" || !unicode.IsDigit((x = (new sliceType($stringToRunes(n.Token.S))), (0 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 0])))) {
+			return n;
+		}
+		nn = new sliceType$1([new Node.ptr(new Token.ptr($clone(n, Node).Loc(), "builtin:number"), ptrType$3.nil, ptrType$4.nil), $clone(n, Node)]);
+		return new Node.ptr(ptrType$2.nil, new Call.ptr($clone(n, Node).Loc(), nn), ptrType$4.nil);
+	};
+	shunt.prototype.makeNum = function(n) { return this.$val.makeNum(n); };
 	Node.ptr.prototype.String = function() {
 		var n;
 		n = this;
@@ -5377,8 +5397,18 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 		return ok;
 	};
 	Call.prototype.IsOperator = function() { return this.$val.IsOperator(); };
+	Call.ptr.prototype.isBuiltin = function() {
+		var c, s, x, x$1;
+		c = this;
+		if ((x = c.Nodes, (0 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 0])).Token === ptrType$2.nil) {
+			return false;
+		}
+		s = (x$1 = c.Nodes, (0 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 0])).Token.S;
+		return s === "builtin:number" || s === "builtin:string";
+	};
+	Call.prototype.isBuiltin = function() { return this.$val.isBuiltin(); };
 	Call.ptr.prototype.String = function() {
-		var _i, _ref, c, kk, loc, nn, result, x, x$1;
+		var _i, _ref, c, kk, loc, nn, result, x, x$1, x$2;
 		c = this;
 		if ($clone(c, Call).IsError()) {
 			loc = new Token.ptr(ptrType$1.nil, $clone(c.Loc, Loc).String());
@@ -5387,7 +5417,10 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 		if ($clone(c, Call).IsOperator()) {
 			return $clone(c, Call).formatOperation();
 		}
-		result = $clone((x$1 = c.Nodes, (0 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 0])), Node).String() + "(";
+		if ($clone(c, Call).isBuiltin()) {
+			return $clone((x$1 = c.Nodes, (1 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 1])), Node).String();
+		}
+		result = $clone((x$2 = c.Nodes, (0 >= x$2.$length ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + 0])), Node).String() + "(";
 		_ref = $subslice(c.Nodes, 1);
 		_i = 0;
 		while (true) {
@@ -5452,11 +5485,11 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 	};
 	Pair.prototype.String = function() { return this.$val.String(); };
 	ptrType$5.methods = [{prop: "isOperator", name: "isOperator", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int32], [$Bool], false)}, {prop: "flush", name: "flush", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int], [], false)}, {prop: "parse", name: "parse", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Node], false)}, {prop: "process", name: "process", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Int32], [], false)}, {prop: "onQuote", name: "onQuote", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Int32], [], false)}];
-	ptrType$6.methods = [{prop: "lastWasTerm", name: "lastWasTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [$Bool], false)}, {prop: "Parsed", name: "Parsed", pkg: "", typ: $funcType([], [Node], false)}, {prop: "Push", name: "Push", pkg: "", typ: $funcType([Token], [], false)}, {prop: "error", name: "error", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$String, ptrType$1], [Node], false)}, {prop: "popTerm", name: "popTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([ptrType$1], [Node], false)}, {prop: "popOp", name: "popOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Token, $Bool], false)}, {prop: "makeCall", name: "makeCall", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token, Node, Node], [Node], false)}, {prop: "isAssoc", name: "isAssoc", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node, $String], [$Bool], false)}, {prop: "pushOp", name: "pushOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token, $Int], [], false)}, {prop: "pushTerm", name: "pushTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "mergeLastTwoTerms", name: "mergeLastTwoTerms", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "topOp", name: "topOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Token, $Bool], false)}, {prop: "rollupDots", name: "rollupDots", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [], false)}, {prop: "pushEndBrackets", name: "pushEndBrackets", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "pushEndBraces", name: "pushEndBraces", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "makeMap", name: "makeMap", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node], [Node], false)}];
+	ptrType$6.methods = [{prop: "lastWasTerm", name: "lastWasTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [$Bool], false)}, {prop: "Parsed", name: "Parsed", pkg: "", typ: $funcType([], [Node], false)}, {prop: "Push", name: "Push", pkg: "", typ: $funcType([Token], [], false)}, {prop: "error", name: "error", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$String, ptrType$1], [Node], false)}, {prop: "popTerm", name: "popTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([ptrType$1], [Node], false)}, {prop: "popOp", name: "popOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Token, $Bool], false)}, {prop: "makeCall", name: "makeCall", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token, Node, Node], [Node], false)}, {prop: "isAssoc", name: "isAssoc", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node, $String], [$Bool], false)}, {prop: "pushOp", name: "pushOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token, $Int], [], false)}, {prop: "pushTerm", name: "pushTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "mergeLastTwoTerms", name: "mergeLastTwoTerms", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "topOp", name: "topOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Token, $Bool], false)}, {prop: "rollupDots", name: "rollupDots", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [], false)}, {prop: "pushEndBrackets", name: "pushEndBrackets", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "pushEndBraces", name: "pushEndBraces", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "makeMap", name: "makeMap", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node], [Node], false)}, {prop: "makeString", name: "makeString", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node], [Node], false)}, {prop: "makeNum", name: "makeNum", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node], [Node], false)}];
 	Node.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}, {prop: "IsError", name: "IsError", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "IsOperator", name: "IsOperator", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "wrap", name: "wrap", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Bool], [$String], false)}, {prop: "Loc", name: "Loc", pkg: "", typ: $funcType([], [ptrType$1], false)}];
 	Loc.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}];
 	Token.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}];
-	Call.methods = [{prop: "IsError", name: "IsError", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "IsOperator", name: "IsOperator", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}, {prop: "formatOperation", name: "formatOperation", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [$String], false)}];
+	Call.methods = [{prop: "IsError", name: "IsError", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "IsOperator", name: "IsOperator", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "isBuiltin", name: "isBuiltin", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [$Bool], false)}, {prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}, {prop: "formatOperation", name: "formatOperation", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [$String], false)}];
 	Map.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}];
 	Pair.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}];
 	parser.init("github.com/funnelorg/funnel/parse", [{prop: "sh", name: "sh", anonymous: false, exported: false, typ: shunt, tag: ""}, {prop: "fname", name: "fname", anonymous: false, exported: false, typ: $String, tag: ""}, {prop: "s", name: "s", anonymous: false, exported: false, typ: $String, tag: ""}, {prop: "digit", name: "digit", anonymous: false, exported: false, typ: $Int, tag: ""}, {prop: "id", name: "id", anonymous: false, exported: false, typ: $Int, tag: ""}, {prop: "quote", name: "quote", anonymous: false, exported: false, typ: $Int, tag: ""}, {prop: "dquote", name: "dquote", anonymous: false, exported: false, typ: $Int, tag: ""}]);
@@ -5480,7 +5513,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/run"] = (function() {
-	var $pkg = {}, $init, parse, E, Runner, Scope, Lazy, mapScope, ptrType, ptrType$1, sliceType, funcType, mapType, ptrType$2, ptrType$3, sliceType$1, mapType$1, ptrType$4, mapType$2, newMapScope, unwrapValue;
+	var $pkg = {}, $init, parse, E, Runner, Scope, Lazy, mapScope, ptrType, ptrType$1, sliceType, funcType, mapType, ptrType$2, ptrType$3, sliceType$1, mapType$1, ptrType$4, mapType$2, unwrapValue, newMapScope;
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	E = $pkg.E = $newType(8, $kindString, "run.E", true, "github.com/funnelorg/funnel/run", true, null);
 	Runner = $pkg.Runner = $newType(0, $kindStruct, "run.Runner", true, "github.com/funnelorg/funnel/run", true, function() {
@@ -5545,18 +5578,6 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: Runner.ptr.prototype.LazyRun }; } $f._r = _r; $f.expr = expr; $f.r = r; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	Runner.prototype.LazyRun = function(s, expr) { return this.$val.LazyRun(s, expr); };
-	Runner.ptr.prototype.runRaw = function(s, expr) {
-		var _r, expr, r, s, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; expr = $f.expr; r = $f.r; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		r = this;
-		if (!(expr.Token === ptrType.nil)) {
-			$s = -1; return new $String(expr.Token.S);
-		}
-		_r = r.Run(s, $clone(expr, parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		$s = -1; return _r;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Runner.ptr.prototype.runRaw }; } $f._r = _r; $f.expr = expr; $f.r = r; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
-	};
-	Runner.prototype.runRaw = function(s, expr) { return this.$val.runRaw(s, expr); };
 	Runner.ptr.prototype.run = function(s, n) {
 		var _r, _r$1, _r$2, _ref, args, fn, fn$1, fn$2, n, r, s, x, $s, $r;
 		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; args = $f.args; fn = $f.fn; fn$1 = $f.fn$1; fn$2 = $f.fn$2; n = $f.n; r = $f.r; s = $f.s; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -5599,6 +5620,42 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: Runner.ptr.prototype.Eval }; } $f._r = _r; $f.fname = fname; $f.r = r; $f.s = s; $f.str = str; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	Runner.prototype.Eval = function(s, fname, str) { return this.$val.Eval(s, fname, str); };
+	unwrapValue = function(v) {
+		var _entry, _i, _key, _keys, _r, _r$1, _r$2, _ref, _ref$1, key, result, v, v$1, v$2, value, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _i = $f._i; _key = $f._key; _keys = $f._keys; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _ref$1 = $f._ref$1; key = $f.key; result = $f.result; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; value = $f.value; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_ref = v;
+		/* */ if ($assertType(_ref, Lazy, true)[1]) { $s = 1; continue; }
+		/* */ if ($assertType(_ref, mapType, true)[1]) { $s = 2; continue; }
+		/* */ $s = 3; continue;
+		/* if ($assertType(_ref, Lazy, true)[1]) { */ case 1:
+			v$1 = _ref;
+			_r = v$1.Value(); /* */ $s = 4; case 4: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_r$1 = unwrapValue(_r); /* */ $s = 5; case 5: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			$s = -1; return _r$1;
+		/* } else if ($assertType(_ref, mapType, true)[1]) { */ case 2:
+			v$2 = _ref.$val;
+			result = $makeMap($emptyInterface.keyFor, []);
+			_ref$1 = v$2;
+			_i = 0;
+			_keys = $keys(_ref$1);
+			/* while (true) { */ case 6:
+				/* if (!(_i < _keys.length)) { break; } */ if(!(_i < _keys.length)) { $s = 7; continue; }
+				_entry = _ref$1[_keys[_i]];
+				if (_entry === undefined) {
+					_i++;
+					/* continue; */ $s = 6; continue;
+				}
+				key = _entry.k;
+				value = _entry.v;
+				_r$2 = unwrapValue(value); /* */ $s = 8; case 8: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+				_key = key; (result || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: _r$2 };
+				_i++;
+			/* } */ $s = 6; continue; case 7:
+			$s = -1; return new mapType(result);
+		/* } */ case 3:
+		$s = -1; return v;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: unwrapValue }; } $f._entry = _entry; $f._i = _i; $f._key = _key; $f._keys = _keys; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f.key = key; $f.result = result; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.value = value; $f.$s = $s; $f.$r = $r; return $f;
+	};
 	newMapScope = function(parsed, base, r) {
 		var base, parsed, r;
 		return new mapScope.ptr($clone(parsed, parse.Map), base, r, false, false, $makeMap($emptyInterface.keyFor, []));
@@ -5681,7 +5738,7 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
 			idx = _i;
 			pp = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Pair);
-			_r = ms.Runner.runRaw(ms.base, $clone(pp.Key, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_r = ms.Runner.run(ms.base, $clone(pp.Key, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 			_key = _r; (ms.keys || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: idx };
 			_i++;
 		/* } */ $s = 1; continue; case 2:
@@ -5689,44 +5746,8 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: mapScope.ptr.prototype.getKeys }; } $f._i = _i; $f._key = _key; $f._r = _r; $f._ref = _ref; $f.idx = idx; $f.ms = ms; $f.pp = pp; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	mapScope.prototype.getKeys = function() { return this.$val.getKeys(); };
-	unwrapValue = function(v) {
-		var _entry, _i, _key, _keys, _r, _r$1, _r$2, _ref, _ref$1, key, result, v, v$1, v$2, value, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _i = $f._i; _key = $f._key; _keys = $f._keys; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _ref$1 = $f._ref$1; key = $f.key; result = $f.result; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; value = $f.value; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		_ref = v;
-		/* */ if ($assertType(_ref, Lazy, true)[1]) { $s = 1; continue; }
-		/* */ if ($assertType(_ref, mapType, true)[1]) { $s = 2; continue; }
-		/* */ $s = 3; continue;
-		/* if ($assertType(_ref, Lazy, true)[1]) { */ case 1:
-			v$1 = _ref;
-			_r = v$1.Value(); /* */ $s = 4; case 4: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-			_r$1 = unwrapValue(_r); /* */ $s = 5; case 5: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
-			$s = -1; return _r$1;
-		/* } else if ($assertType(_ref, mapType, true)[1]) { */ case 2:
-			v$2 = _ref.$val;
-			result = $makeMap($emptyInterface.keyFor, []);
-			_ref$1 = v$2;
-			_i = 0;
-			_keys = $keys(_ref$1);
-			/* while (true) { */ case 6:
-				/* if (!(_i < _keys.length)) { break; } */ if(!(_i < _keys.length)) { $s = 7; continue; }
-				_entry = _ref$1[_keys[_i]];
-				if (_entry === undefined) {
-					_i++;
-					/* continue; */ $s = 6; continue;
-				}
-				key = _entry.k;
-				value = _entry.v;
-				_r$2 = unwrapValue(value); /* */ $s = 8; case 8: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
-				_key = key; (result || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: _r$2 };
-				_i++;
-			/* } */ $s = 6; continue; case 7:
-			$s = -1; return new mapType(result);
-		/* } */ case 3:
-		$s = -1; return v;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: unwrapValue }; } $f._entry = _entry; $f._i = _i; $f._key = _key; $f._keys = _keys; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f.key = key; $f.result = result; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.value = value; $f.$s = $s; $f.$r = $r; return $f;
-	};
 	E.methods = [{prop: "Error", name: "Error", pkg: "", typ: $funcType([], [$String], false)}];
-	ptrType$2.methods = [{prop: "Run", name: "Run", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "LazyRun", name: "LazyRun", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "runRaw", name: "runRaw", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "run", name: "run", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "Eval", name: "Eval", pkg: "", typ: $funcType([Scope, $String, $String], [$emptyInterface], false)}];
+	ptrType$2.methods = [{prop: "Run", name: "Run", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "LazyRun", name: "LazyRun", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "run", name: "run", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "Eval", name: "Eval", pkg: "", typ: $funcType([Scope, $String, $String], [$emptyInterface], false)}];
 	ptrType$4.methods = [{prop: "Value", name: "Value", pkg: "", typ: $funcType([], [$emptyInterface], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "getKeys", name: "getKeys", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([], [mapType$1], false)}];
 	Runner.init("", []);
 	Scope.init([{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}]);
@@ -10853,7 +10874,7 @@ $packages["reflect"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/runtime"] = (function() {
-	var $pkg = {}, $init, errors, parse, run, reflect, strconv, invocation, Number, rtscope, empty, sliceType, funcType, ptrType, sliceType$1, sliceType$2, sliceType$3, ptrType$1, mapType, def, x, _r, Dot, Error, Fun, Num, Sum, Function, NewScope;
+	var $pkg = {}, $init, errors, parse, run, reflect, strconv, invocation, Number, rtscope, empty, sliceType, funcType, ptrType, sliceType$1, sliceType$2, sliceType$3, ptrType$1, mapType, def, x, _r, Dot, Error, Fun, Num, Sum, Function, NewScope, String;
 	errors = $packages["errors"];
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	run = $packages["github.com/funnelorg/funnel/run"];
@@ -11029,39 +11050,37 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 	};
 	invocation.prototype.Get = function(key) { return this.$val.Get(key); };
 	Num = function(s, args) {
-		var _r$1, _ref, _tuple, args, err, f, f$1, f$2, ff, result, s, x$1, x$2, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r$1 = $f._r$1; _ref = $f._ref; _tuple = $f._tuple; args = $f.args; err = $f.err; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; ff = $f.ff; result = $f.result; s = $f.s; x$1 = $f.x$1; x$2 = $f.x$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		var _r$1, _ref, _tuple, args, err, f, f$1, ff, result, s, x$1, x$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r$1 = $f._r$1; _ref = $f._ref; _tuple = $f._tuple; args = $f.args; err = $f.err; f = $f.f; f$1 = $f.f$1; ff = $f.ff; result = $f.result; s = $f.s; x$1 = $f.x$1; x$2 = $f.x$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		if (!((args.$length === 1))) {
 			$s = -1; return errors.New("num: incorrect number of args");
+		}
+		if (!((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
+			_tuple = strconv.ParseFloat((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S, 64);
+			ff = _tuple[0];
+			err = _tuple[1];
+			if ($interfaceIsEqual(err, $ifaceNil)) {
+				$s = -1; return (x$1 = new Number.ptr(ff), new x$1.constructor.elem(x$1));
+			}
+			$s = -1; return err;
 		}
 		_r$1 = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
 		result = _r$1;
 		_ref = result;
 		if ($assertType(_ref, $Float64, true)[1]) {
 			f = _ref.$val;
-			$s = -1; return (x$1 = new Number.ptr(f), new x$1.constructor.elem(x$1));
-		} else if ($assertType(_ref, Number, true)[1]) {
-			f$1 = $clone(_ref.$val, Number);
+			$s = -1; return (x$2 = new Number.ptr(f), new x$2.constructor.elem(x$2));
+		} else if ($assertType(_ref, Number, true)[1] || $assertType(_ref, $error, true)[1]) {
+			f$1 = _ref;
 			$s = -1; return result;
-		} else if ($assertType(_ref, $error, true)[1]) {
-			f$2 = _ref;
-			if (!((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
-				_tuple = strconv.ParseFloat((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S, 64);
-				ff = _tuple[0];
-				err = _tuple[1];
-				if ($interfaceIsEqual(err, $ifaceNil)) {
-					$s = -1; return (x$2 = new Number.ptr(ff), new x$2.constructor.elem(x$2));
-				}
-			}
-			$s = -1; return f$2;
 		}
 		$s = -1; return errors.New("num: invalid arg type");
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Num }; } $f._r$1 = _r$1; $f._ref = _ref; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.ff = ff; $f.result = result; $f.s = s; $f.x$1 = x$1; $f.x$2 = x$2; $f.$s = $s; $f.$r = $r; return $f;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Num }; } $f._r$1 = _r$1; $f._ref = _ref; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.f = f; $f.f$1 = f$1; $f.ff = ff; $f.result = result; $f.s = s; $f.x$1 = x$1; $f.x$2 = x$2; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.Num = Num;
 	Sum = function(s, args) {
-		var _i, _r$1, _ref, _ref$1, _tuple, args, err, f, f$1, f$2, f$3, ff, n, result, s, sum, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r$1 = $f._r$1; _ref = $f._ref; _ref$1 = $f._ref$1; _tuple = $f._tuple; args = $f.args; err = $f.err; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; ff = $f.ff; n = $f.n; result = $f.result; s = $f.s; sum = $f.sum; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		var _i, _r$1, _ref, _ref$1, args, f, f$1, f$2, f$3, n, result, s, sum, x$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r$1 = $f._r$1; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; n = $f.n; result = $f.result; s = $f.s; sum = $f.sum; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		sum = 0;
 		_ref = args;
 		_i = 0;
@@ -11079,16 +11098,6 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 				sum = sum + (f$1.F);
 			} else if ($assertType(_ref$1, $error, true)[1]) {
 				f$2 = _ref$1;
-				if (!(n.Token === ptrType.nil)) {
-					_tuple = strconv.ParseFloat(n.Token.S, 64);
-					ff = _tuple[0];
-					err = _tuple[1];
-					if ($interfaceIsEqual(err, $ifaceNil)) {
-						sum = sum + (ff);
-						_i++;
-						/* continue; */ $s = 1; continue;
-					}
-				}
 				$s = -1; return result;
 			} else {
 				f$3 = _ref$1;
@@ -11097,7 +11106,7 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 			_i++;
 		/* } */ $s = 1; continue; case 2:
 		$s = -1; return (x$1 = new Number.ptr(sum), new x$1.constructor.elem(x$1));
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Sum }; } $f._i = _i; $f._r$1 = _r$1; $f._ref = _ref; $f._ref$1 = _ref$1; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.ff = ff; $f.n = n; $f.result = result; $f.s = s; $f.sum = sum; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Sum }; } $f._i = _i; $f._r$1 = _r$1; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.n = n; $f.result = result; $f.s = s; $f.sum = sum; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.Sum = Sum;
 	Function = function(fn) {
@@ -11211,6 +11220,25 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 		return errors.New("no such key");
 	};
 	empty.prototype.Get = function(key) { return this.$val.Get(key); };
+	String = function(s, args) {
+		var _r$1, _ref, args, result, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r$1 = $f._r$1; _ref = $f._ref; args = $f.args; result = $f.result; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (!((args.$length === 1))) {
+			$s = -1; return errors.New("string: incorrect number of args");
+		}
+		if (!((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
+			$s = -1; return new $String((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S);
+		}
+		_r$1 = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		result = _r$1;
+		_ref = result;
+		if ($assertType(_ref, $String, true)[1] || $assertType(_ref, $error, true)[1]) {
+			$s = -1; return result;
+		}
+		$s = -1; return errors.New("string: invalid arg type");
+		/* */ } return; } if ($f === undefined) { $f = { $blk: String }; } $f._r$1 = _r$1; $f._ref = _ref; $f.args = args; $f.result = result; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.String = String;
 	invocation.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
 	ptrType$1.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
 	empty.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
@@ -11226,7 +11254,7 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = reflect.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = strconv.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		def = $makeMap($emptyInterface.keyFor, [{ k: new $String("!"), v: new funcType(Error) }, { k: new $String("."), v: new funcType(Dot) }, { k: new $String("+"), v: new funcType(Sum) }, { k: new $String("num"), v: new funcType(Num) }, { k: new $String("fun"), v: new funcType(Fun) }]);
+		def = $makeMap($emptyInterface.keyFor, [{ k: new $String("!"), v: new funcType(Error) }, { k: new $String("."), v: new funcType(Dot) }, { k: new $String("+"), v: new funcType(Sum) }, { k: new $String("builtin:number"), v: new funcType(Num) }, { k: new $String("builtin:string"), v: new funcType(String) }, { k: new $String("fun"), v: new funcType(Fun) }]);
 		_r = NewScope(def, (x = new empty.ptr(), new x.constructor.elem(x))); /* */ $s = 6; case 6: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 		$pkg.DefaultScope = _r;
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
