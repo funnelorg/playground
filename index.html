@@ -76,9 +76,16 @@
         </div>
       </div>
       <div><b>As the example above shows, the order of expressions within the curly braces does not mater</b></div>
+      <p> Functions with one parameter do not need <code>()</code>: </p>
+      <div class="snippet">
+        <div class="code">{result = fn 2, fn = fun(x, 2*x)}.result</div>
+        <div class="wrapper">
+          <button>&#9654; Run</button> <span class="output">Output</span>
+        </div>
+      </div>
       <p> This demo also has a url function which allows fetching arbitrary json: </p>
       <div class="snippet">
-        <div class="code">url(builtin:string "https://api.myjson.com/bins/ngfbw").json()</div>
+        <div class="code">url(string "https://api.myjson.com/bins/ngfbw").json()</div>
         <div class="wrapper">
           <button>&#9654; Run</button> <span class="output">Output</span>
         </div>
