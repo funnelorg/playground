@@ -54,6 +54,13 @@
           <button>&#9654; Run</button> <span class="output">Output</span>
         </div>
       </div>
+      <p> The if function can be used for conditional expressions: </p>
+      <div class="snippet">
+        <div class="code">if(2 > 5, 11, 12)</div>
+        <div class="wrapper">
+          <button>&#9654; Run</button> <span class="output">Output</span>
+        </div>
+      </div>
       <p> Funnel also supports multiple expressions: </p>
       <div class="snippet">
         <div class="code">{x = 42, y = 23, result = x + y}.result</div>
@@ -64,6 +71,14 @@
       <p> Functions can be define using <code>fun</code>: </p>
       <div class="snippet">
         <div class="code">{result = fn(2, 3), fn = fun(a, b, a + b)}.result</div>
+        <div class="wrapper">
+          <button>&#9654; Run</button> <span class="output">Output</span>
+        </div>
+      </div>
+      <div><b>As the example above shows, the order of expressions within the curly braces does not mater</b></div>
+      <p> This demo also has a url function which allows fetching arbitrary json: </p>
+      <div class="snippet">
+        <div class="code">url(builtin:string "http://ip.jsontest.com/").json()</div>
         <div class="wrapper">
           <button>&#9654; Run</button> <span class="output">Output</span>
         </div>

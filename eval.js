@@ -4500,9 +4500,10 @@ $packages["unicode"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/parse"] = (function() {
-	var $pkg = {}, $init, strconv, unicode, parser, shunt, Node, Loc, Token, Call, Map, Pair, sliceType, sliceType$1, sliceType$2, ptrType, ptrType$1, ptrType$2, ptrType$3, ptrType$4, sliceType$3, ptrType$5, ptrType$6, mapType, priority, isAssoc, Parse;
+	var $pkg = {}, $init, strconv, unicode, utf8, parser, shunt, Node, Loc, Token, Call, Map, Pair, sliceType, sliceType$1, sliceType$2, ptrType, ptrType$1, ptrType$2, ptrType$3, ptrType$4, sliceType$3, ptrType$5, ptrType$6, mapType, priority, isAssoc, Parse;
 	strconv = $packages["strconv"];
 	unicode = $packages["unicode"];
+	utf8 = $packages["unicode/utf8"];
 	parser = $pkg.parser = $newType(0, $kindStruct, "parse.parser", true, "github.com/funnelorg/funnel/parse", false, function(sh_, fname_, s_, digit_, id_, quote_, dquote_) {
 		this.$val = this;
 		if (arguments.length === 0) {
@@ -4613,14 +4614,14 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 	ptrType$5 = $ptrType(parser);
 	ptrType$6 = $ptrType(shunt);
 	mapType = $mapType(ptrType$1, $Bool);
-	parser.ptr.prototype.isOperator = function(r) {
-		var _entry, _tuple, ok, p, r;
+	parser.ptr.prototype.isOperator = function(s) {
+		var _entry, _tuple, ok, p, s;
 		p = this;
-		_tuple = (_entry = priority[$String.keyFor(($runesToString(new sliceType([r]))))], _entry !== undefined ? [_entry.v, true] : [0, false]);
+		_tuple = (_entry = priority[$String.keyFor(s)], _entry !== undefined ? [_entry.v, true] : [0, false]);
 		ok = _tuple[1];
-		return ok && (!((r === 46)) || (p.digit === -1));
+		return ok && (!(s === ".") || (p.digit === -1));
 	};
-	parser.prototype.isOperator = function(r) { return this.$val.isOperator(r); };
+	parser.prototype.isOperator = function(s) { return this.$val.isOperator(s); };
 	parser.ptr.prototype.flush = function(idx) {
 		var idx, loc, loc$1, p;
 		p = this;
@@ -4637,33 +4638,67 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 	};
 	parser.prototype.flush = function(idx) { return this.$val.flush(idx); };
 	parser.ptr.prototype.parse = function() {
-		var _i, _ref, _rune, kk, p, rr;
+		var _tmp, _tmp$1, _tmp$2, _tmp$3, _tuple, _tuple$1, i, last, next, p, rr, s, w, width;
 		p = this;
-		_ref = p.s;
-		_i = 0;
+		last = 0;
+		s = p.s;
+		_tmp = 0;
+		_tmp$1 = 0;
+		i = _tmp;
+		width = _tmp$1;
 		while (true) {
-			if (!(_i < _ref.length)) { break; }
-			_rune = $decodeRune(_ref, _i);
-			kk = _i;
-			rr = _rune[0];
-			p.process(kk, rr);
-			_i += _rune[1];
+			if (!(i < s.length)) { break; }
+			next = 0;
+			_tuple = utf8.DecodeRuneInString($substring(s, i));
+			rr = _tuple[0];
+			w = _tuple[1];
+			if ((i + w >> 0) < s.length) {
+				_tuple$1 = utf8.DecodeRuneInString($substring(s, (i + w >> 0)));
+				next = _tuple$1[0];
+			}
+			p.process(i, rr, next, last);
+			_tmp$2 = w;
+			_tmp$3 = rr;
+			width = _tmp$2;
+			last = _tmp$3;
+			i = i + (width) >> 0;
 		}
 		p.flush(p.s.length);
 		return p.sh.Parsed();
 	};
 	parser.prototype.parse = function() { return this.$val.parse(); };
-	parser.ptr.prototype.process = function(kk, rr) {
-		var kk, loc, p, rr;
+	parser.ptr.prototype.isOperatorEnd = function(rr, last) {
+		var last, p, rr;
+		p = this;
+		return (rr === 61) && p.isOperator(($runesToString(new sliceType([last, rr]))));
+	};
+	parser.prototype.isOperatorEnd = function(rr, last) { return this.$val.isOperatorEnd(rr, last); };
+	parser.ptr.prototype.isOperatorStart = function(rr, next) {
+		var next, p, rr;
+		p = this;
+		return (next === 61) && p.isOperator(($runesToString(new sliceType([rr, next]))));
+	};
+	parser.prototype.isOperatorStart = function(rr, next) { return this.$val.isOperatorStart(rr, next); };
+	parser.ptr.prototype.inQuote = function(rr) {
+		var p, rr;
+		p = this;
+		return p.quote >= 0 && !((rr === 39)) || p.dquote >= 0 && !((rr === 34));
+	};
+	parser.prototype.inQuote = function(rr) { return this.$val.inQuote(rr); };
+	parser.ptr.prototype.process = function(kk, rr, next, last) {
+		var kk, last, loc, next, p, rr;
 		p = this;
 		loc = new Loc.ptr(p.fname, kk);
-		if (p.quote >= 0 && !((rr === 39))) {
-		} else if (p.dquote >= 0 && !((rr === 34))) {
+		if (p.inQuote(rr)) {
 		} else if (((rr === 39)) || ((rr === 34))) {
 			p.onQuote(kk, rr);
 		} else if (unicode.IsSpace(rr)) {
 			p.flush(kk);
-		} else if (p.isOperator(rr)) {
+		} else if (p.isOperatorEnd(rr, last)) {
+			p.flush(kk - 1 >> 0);
+			p.sh.Push(new Token.ptr(new Loc.ptr(p.fname, kk - 1 >> 0), ($runesToString(new sliceType([last, rr])))));
+		} else if (p.isOperatorStart(rr, next)) {
+		} else if (p.isOperator(($encodeRune(rr)))) {
 			p.flush(kk);
 			p.sh.Push(new Token.ptr(loc, ($encodeRune(rr))));
 		} else if (unicode.IsDigit(rr)) {
@@ -4674,7 +4709,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 			p.id = kk;
 		}
 	};
-	parser.prototype.process = function(kk, rr) { return this.$val.process(kk, rr); };
+	parser.prototype.process = function(kk, rr, next, last) { return this.$val.process(kk, rr, next, last); };
 	parser.ptr.prototype.onQuote = function(kk, rr) {
 		var kk, l, l$1, p, rr;
 		p = this;
@@ -5232,7 +5267,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 		return $clone(p.Key, Node).String() + " = " + $clone(p.Value, Node).String();
 	};
 	Pair.prototype.String = function() { return this.$val.String(); };
-	ptrType$5.methods = [{prop: "isOperator", name: "isOperator", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int32], [$Bool], false)}, {prop: "flush", name: "flush", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int], [], false)}, {prop: "parse", name: "parse", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Node], false)}, {prop: "process", name: "process", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Int32], [], false)}, {prop: "onQuote", name: "onQuote", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Int32], [], false)}];
+	ptrType$5.methods = [{prop: "isOperator", name: "isOperator", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$String], [$Bool], false)}, {prop: "flush", name: "flush", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int], [], false)}, {prop: "parse", name: "parse", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Node], false)}, {prop: "isOperatorEnd", name: "isOperatorEnd", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int32, $Int32], [$Bool], false)}, {prop: "isOperatorStart", name: "isOperatorStart", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int32, $Int32], [$Bool], false)}, {prop: "inQuote", name: "inQuote", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int32], [$Bool], false)}, {prop: "process", name: "process", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Int32, $Int32, $Int32], [], false)}, {prop: "onQuote", name: "onQuote", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Int32], [], false)}];
 	ptrType$6.methods = [{prop: "lastWasTerm", name: "lastWasTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [$Bool], false)}, {prop: "Parsed", name: "Parsed", pkg: "", typ: $funcType([], [Node], false)}, {prop: "Push", name: "Push", pkg: "", typ: $funcType([Token], [], false)}, {prop: "error", name: "error", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$String, ptrType$1], [Node], false)}, {prop: "popTerm", name: "popTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([ptrType$1], [Node], false)}, {prop: "popOp", name: "popOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Token, $Bool], false)}, {prop: "makeCall", name: "makeCall", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token, Node, Node], [Node], false)}, {prop: "isAssoc", name: "isAssoc", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node, $String], [$Bool], false)}, {prop: "pushOp", name: "pushOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token, $Int], [], false)}, {prop: "pushTerm", name: "pushTerm", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "mergeLastTwoTerms", name: "mergeLastTwoTerms", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "topOp", name: "topOp", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [Token, $Bool], false)}, {prop: "rollupDots", name: "rollupDots", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([], [], false)}, {prop: "pushEndBrackets", name: "pushEndBrackets", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "pushEndBraces", name: "pushEndBraces", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Token], [], false)}, {prop: "makeMap", name: "makeMap", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node], [Node], false)}, {prop: "makeString", name: "makeString", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node], [Node], false)}, {prop: "makeNum", name: "makeNum", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([Node], [Node], false)}];
 	Node.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}, {prop: "IsError", name: "IsError", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "IsOperator", name: "IsOperator", pkg: "", typ: $funcType([], [$Bool], false)}, {prop: "wrap", name: "wrap", pkg: "github.com/funnelorg/funnel/parse", typ: $funcType([$Int, $Bool], [$String], false)}, {prop: "Loc", name: "Loc", pkg: "", typ: $funcType([], [ptrType$1], false)}];
 	Loc.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}];
@@ -5253,31 +5288,49 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		$r = strconv.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = unicode.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		priority = $makeMap($String.keyFor, [{ k: "{", v: 0 }, { k: "}", v: 0 }, { k: "(", v: 0 }, { k: ")", v: 0 }, { k: ",", v: 1 }, { k: "=", v: 2 }, { k: "+", v: 10 }, { k: "-", v: 10 }, { k: "*", v: 20 }, { k: "/", v: 20 }, { k: ".", v: 30 }]);
-		isAssoc = $makeMap($String.keyFor, [{ k: ",", v: true }, { k: "=", v: true }, { k: "+", v: true }, { k: "-", v: true }, { k: "*", v: true }, { k: "/", v: true }]);
+		$r = utf8.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		priority = $makeMap($String.keyFor, [{ k: "{", v: 0 }, { k: "}", v: 0 }, { k: "(", v: 0 }, { k: ")", v: 0 }, { k: ",", v: 1 }, { k: "=", v: 2 }, { k: "|", v: 3 }, { k: "&", v: 4 }, { k: "==", v: 5 }, { k: "!=", v: 5 }, { k: "<", v: 7 }, { k: ">", v: 7 }, { k: "<=", v: 7 }, { k: ">=", v: 7 }, { k: "+", v: 10 }, { k: "-", v: 10 }, { k: "*", v: 20 }, { k: "/", v: 20 }, { k: ".", v: 30 }]);
+		isAssoc = $makeMap($String.keyFor, [{ k: ",", v: true }, { k: "=", v: true }, { k: "+", v: true }, { k: "-", v: true }, { k: "*", v: true }, { k: "/", v: true }, { k: "&", v: true }, { k: "|", v: true }, { k: "<", v: true }, { k: "<=", v: true }, { k: ">", v: true }, { k: ">=", v: true }, { k: "==", v: true }, { k: "!=", v: true }]);
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.$init = $init;
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/run"] = (function() {
-	var $pkg = {}, $init, parse, E, Runner, Scope, Lazy, mapScope, ptrType, ptrType$1, sliceType, funcType, mapType, ptrType$2, ptrType$3, sliceType$1, mapType$1, ptrType$4, mapType$2, unwrapValue, newMapScope;
+	var $pkg = {}, $init, parse, strconv, ErrorStack, stackable, Runner, ArgsResolver, callable, Scope, Lazy, mapScope, scope, ptrType, sliceType, ptrType$1, ptrType$2, sliceType$1, funcType, mapType, ptrType$3, ptrType$4, sliceType$2, mapType$1, ptrType$5, mapType$2, ptrType$6, WrapError, unwrapValue, newMapScope, NewScope;
 	parse = $packages["github.com/funnelorg/funnel/parse"];
-	E = $pkg.E = $newType(8, $kindString, "run.E", true, "github.com/funnelorg/funnel/run", true, null);
+	strconv = $packages["strconv"];
+	ErrorStack = $pkg.ErrorStack = $newType(0, $kindStruct, "run.ErrorStack", true, "github.com/funnelorg/funnel/run", true, function(Message_, File_, Offset_, Inner_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Message = "";
+			this.File = "";
+			this.Offset = 0;
+			this.Inner = $ifaceNil;
+			return;
+		}
+		this.Message = Message_;
+		this.File = File_;
+		this.Offset = Offset_;
+		this.Inner = Inner_;
+	});
+	stackable = $pkg.stackable = $newType(8, $kindInterface, "run.stackable", true, "github.com/funnelorg/funnel/run", false, null);
 	Runner = $pkg.Runner = $newType(0, $kindStruct, "run.Runner", true, "github.com/funnelorg/funnel/run", true, function() {
 		this.$val = this;
 		if (arguments.length === 0) {
 			return;
 		}
 	});
+	ArgsResolver = $pkg.ArgsResolver = $newType(4, $kindFunc, "run.ArgsResolver", true, "github.com/funnelorg/funnel/run", true, null);
+	callable = $pkg.callable = $newType(8, $kindInterface, "run.callable", true, "github.com/funnelorg/funnel/run", false, null);
 	Scope = $pkg.Scope = $newType(8, $kindInterface, "run.Scope", true, "github.com/funnelorg/funnel/run", true, null);
 	Lazy = $pkg.Lazy = $newType(8, $kindInterface, "run.Lazy", true, "github.com/funnelorg/funnel/run", true, null);
 	mapScope = $pkg.mapScope = $newType(0, $kindStruct, "run.mapScope", true, "github.com/funnelorg/funnel/run", false, function(parsed_, base_, Runner_, values_, keys_, running_) {
 		this.$val = this;
 		if (arguments.length === 0) {
-			this.parsed = new parse.Map.ptr(ptrType$3.nil, sliceType$1.nil);
+			this.parsed = new parse.Map.ptr(ptrType$4.nil, sliceType$2.nil);
 			this.base = $ifaceNil;
-			this.Runner = ptrType$2.nil;
+			this.Runner = ptrType$3.nil;
 			this.values = false;
 			this.keys = false;
 			this.running = false;
@@ -5290,23 +5343,103 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		this.keys = keys_;
 		this.running = running_;
 	});
-	ptrType = $ptrType(parse.Token);
-	ptrType$1 = $ptrType(parse.Map);
-	sliceType = $sliceType(parse.Node);
-	funcType = $funcType([Scope, sliceType], [$emptyInterface], false);
+	scope = $pkg.scope = $newType(0, $kindStruct, "run.scope", true, "github.com/funnelorg/funnel/run", false, function(mm_, base_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.mm = false;
+			this.base = $ifaceNil;
+			return;
+		}
+		this.mm = mm_;
+		this.base = base_;
+	});
+	ptrType = $ptrType(ErrorStack);
+	sliceType = $sliceType($emptyInterface);
+	ptrType$1 = $ptrType(parse.Token);
+	ptrType$2 = $ptrType(parse.Map);
+	sliceType$1 = $sliceType(parse.Node);
+	funcType = $funcType([Scope, sliceType$1], [$emptyInterface], false);
 	mapType = $mapType($emptyInterface, $emptyInterface);
-	ptrType$2 = $ptrType(Runner);
-	ptrType$3 = $ptrType(parse.Loc);
-	sliceType$1 = $sliceType(parse.Pair);
+	ptrType$3 = $ptrType(Runner);
+	ptrType$4 = $ptrType(parse.Loc);
+	sliceType$2 = $sliceType(parse.Pair);
 	mapType$1 = $mapType($emptyInterface, $Int);
-	ptrType$4 = $ptrType(mapScope);
+	ptrType$5 = $ptrType(mapScope);
 	mapType$2 = $mapType($emptyInterface, $Bool);
-	E.prototype.Error = function() {
-		var e;
-		e = this.$val;
-		return (e);
+	ptrType$6 = $ptrType(scope);
+	ErrorStack.ptr.prototype.Error = function() {
+		var _r, es, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; es = $f.es; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		es = this;
+		/* */ if (!($interfaceIsEqual(es.Inner, $ifaceNil))) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (!($interfaceIsEqual(es.Inner, $ifaceNil))) { */ case 1:
+			_r = es.Inner.Error(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			$s = -1; return _r;
+		/* } */ case 2:
+		$s = -1; return es.format();
+		/* */ } return; } if ($f === undefined) { $f = { $blk: ErrorStack.ptr.prototype.Error }; } $f._r = _r; $f.es = es; $f.$s = $s; $f.$r = $r; return $f;
 	};
-	$ptrType(E).prototype.Error = function() { return new E(this.$get()).Error(); };
+	ErrorStack.prototype.Error = function() { return this.$val.Error(); };
+	ErrorStack.ptr.prototype.Stack = function() {
+		var _r, _r$1, _tuple, es, ok, s, stack, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _tuple = $f._tuple; es = $f.es; ok = $f.ok; s = $f.s; stack = $f.stack; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		es = this;
+		stack = "";
+		/* */ if (!($interfaceIsEqual(es.Inner, $ifaceNil))) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (!($interfaceIsEqual(es.Inner, $ifaceNil))) { */ case 1:
+			_tuple = $assertType(es.Inner, stackable, true);
+			s = _tuple[0];
+			ok = _tuple[1];
+			/* */ if (ok) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (ok) { */ case 3:
+				_r = s.Stack(); /* */ $s = 6; case 6: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				stack = _r;
+				$s = 5; continue;
+			/* } else { */ case 4:
+				_r$1 = es.Inner.Error(); /* */ $s = 7; case 7: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+				stack = _r$1 + "\n";
+			/* } */ case 5:
+		/* } */ case 2:
+		$s = -1; return stack + es.format() + "\n";
+		/* */ } return; } if ($f === undefined) { $f = { $blk: ErrorStack.ptr.prototype.Stack }; } $f._r = _r; $f._r$1 = _r$1; $f._tuple = _tuple; $f.es = es; $f.ok = ok; $f.s = s; $f.stack = stack; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	ErrorStack.prototype.Stack = function() { return this.$val.Stack(); };
+	ErrorStack.ptr.prototype.format = function() {
+		var es, suffix;
+		es = this;
+		suffix = "";
+		if (!(es.File === "") || !((es.Offset === 0))) {
+			suffix = " at " + es.File + ":" + strconv.Itoa(es.Offset);
+		}
+		return es.Message + suffix;
+	};
+	ErrorStack.prototype.format = function() { return this.$val.format(); };
+	WrapError = function(x, l) {
+		var _tmp, _tmp$1, _tuple, _tuple$1, e, es, l, ok, ok$1, x;
+		_tuple = $assertType(x, ptrType, true);
+		es = _tuple[0];
+		ok = _tuple[1];
+		if (ok) {
+			if ((es.Offset === 0) && es.File === "") {
+				_tmp = l.File;
+				_tmp$1 = l.Offset;
+				es.File = _tmp;
+				es.Offset = _tmp$1;
+			}
+			return es;
+		}
+		_tuple$1 = $assertType(x, $error, true);
+		e = _tuple$1[0];
+		ok$1 = _tuple$1[1];
+		if (ok$1) {
+			return new ErrorStack.ptr("", l.File, l.Offset, e);
+		}
+		return x;
+	};
+	$pkg.WrapError = WrapError;
 	Runner.ptr.prototype.Run = function(s, expr) {
 		var _r, _r$1, expr, r, s, $s, $r;
 		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; expr = $f.expr; r = $f.r; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -5326,17 +5459,36 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: Runner.ptr.prototype.LazyRun }; } $f._r = _r; $f.expr = expr; $f.r = r; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	Runner.prototype.LazyRun = function(s, expr) { return this.$val.LazyRun(s, expr); };
-	Runner.ptr.prototype.run = function(s, n) {
-		var _r, _r$1, _r$2, _ref, args, fn, fn$1, fn$2, n, r, s, x, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; args = $f.args; fn = $f.fn; fn$1 = $f.fn$1; fn$2 = $f.fn$2; n = $f.n; r = $f.r; s = $f.s; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+	Runner.ptr.prototype.ResolveArgs = function(s, args) {
+		var _i, _r, _ref, arg, args, kk, r, resolved, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; arg = $f.arg; args = $f.args; kk = $f.kk; r = $f.r; resolved = $f.resolved; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		r = this;
-			/* */ if (!(n.Token === ptrType.nil)) { $s = 2; continue; }
-			/* */ if (!(n.Map === ptrType$1.nil)) { $s = 3; continue; }
+		resolved = $makeSlice(sliceType, args.$length);
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			kk = _i;
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = r.LazyRun(s, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			((kk < 0 || kk >= resolved.$length) ? ($throwRuntimeError("index out of range"), undefined) : resolved.$array[resolved.$offset + kk] = _r);
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return resolved;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Runner.ptr.prototype.ResolveArgs }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f.arg = arg; $f.args = args; $f.kk = kk; $f.r = r; $f.resolved = resolved; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Runner.prototype.ResolveArgs = function(s, args) { return this.$val.ResolveArgs(s, args); };
+	Runner.ptr.prototype.run = function(s, n) {
+		var _r, _r$1, _r$2, _r$3, _r$4, _r$5, _ref, args, fn, fn$1, fn$2, fn$3, n, r, s, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _r$4 = $f._r$4; _r$5 = $f._r$5; _ref = $f._ref; args = $f.args; fn = $f.fn; fn$1 = $f.fn$1; fn$2 = $f.fn$2; fn$3 = $f.fn$3; n = $f.n; r = $f.r; s = $f.s; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		r = this;
+			/* */ if (!(n.Token === ptrType$1.nil)) { $s = 2; continue; }
+			/* */ if (!(n.Map === ptrType$2.nil)) { $s = 3; continue; }
 			/* */ $s = 4; continue;
-			/* if (!(n.Token === ptrType.nil)) { */ case 2:
+			/* if (!(n.Token === ptrType$1.nil)) { */ case 2:
 				_r = s.Get(new $String(n.Token.S)); /* */ $s = 5; case 5: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 				$s = -1; return _r;
-			/* } else if (!(n.Map === ptrType$1.nil)) { */ case 3:
+			/* } else if (!(n.Map === ptrType$2.nil)) { */ case 3:
 				$s = -1; return newMapScope($clone(n.Map, parse.Map), s, r);
 			/* } */ case 4:
 		case 1:
@@ -5345,18 +5497,25 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		args = $subslice(n.Call.Nodes, 1);
 		_ref = fn;
 		/* */ if ($assertType(_ref, funcType, true)[1]) { $s = 7; continue; }
-		/* */ if ($assertType(_ref, $error, true)[1]) { $s = 8; continue; }
-		/* */ $s = 9; continue;
+		/* */ if ($assertType(_ref, callable, true)[1]) { $s = 8; continue; }
+		/* */ if ($assertType(_ref, $error, true)[1]) { $s = 9; continue; }
+		/* */ $s = 10; continue;
 		/* if ($assertType(_ref, funcType, true)[1]) { */ case 7:
 			fn$1 = _ref.$val;
-			_r$2 = fn$1(s, args); /* */ $s = 10; case 10: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
-			$s = -1; return _r$2;
-		/* } else if ($assertType(_ref, $error, true)[1]) { */ case 8:
+			_r$2 = fn$1(s, args); /* */ $s = 11; case 11: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+			_r$3 = WrapError(_r$2, $clone(n, parse.Node).Loc()); /* */ $s = 12; case 12: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+			$s = -1; return _r$3;
+		/* } else if ($assertType(_ref, callable, true)[1]) { */ case 8:
 			fn$2 = _ref;
-			$s = -1; return fn$2;
-		/* } */ case 9:
-		$s = -1; return new E($pkg.ErrNotFunction);
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Runner.ptr.prototype.run }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f.args = args; $f.fn = fn; $f.fn$1 = fn$1; $f.fn$2 = fn$2; $f.n = n; $f.r = r; $f.s = s; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+			_r$4 = fn$2.Call(s, args); /* */ $s = 13; case 13: if($c) { $c = false; _r$4 = _r$4.$blk(); } if (_r$4 && _r$4.$blk !== undefined) { break s; }
+			_r$5 = WrapError(_r$4, $clone(n, parse.Node).Loc()); /* */ $s = 14; case 14: if($c) { $c = false; _r$5 = _r$5.$blk(); } if (_r$5 && _r$5.$blk !== undefined) { break s; }
+			$s = -1; return _r$5;
+		/* } else if ($assertType(_ref, $error, true)[1]) { */ case 9:
+			fn$3 = _ref;
+			$s = -1; return WrapError(fn$3, $clone(n, parse.Node).Loc());
+		/* } */ case 10:
+		$s = -1; return WrapError(new ErrorStack.ptr("not a function", "", 0, $ifaceNil), $clone(n, parse.Node).Loc());
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Runner.ptr.prototype.run }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._r$4 = _r$4; $f._r$5 = _r$5; $f._ref = _ref; $f.args = args; $f.fn = fn; $f.fn$1 = fn$1; $f.fn$2 = fn$2; $f.fn$3 = fn$3; $f.n = n; $f.r = r; $f.s = s; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	Runner.prototype.run = function(s, n) { return this.$val.run(s, n); };
 	Runner.ptr.prototype.Eval = function(s, fname, str) {
@@ -5404,6 +5563,17 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		$s = -1; return v;
 		/* */ } return; } if ($f === undefined) { $f = { $blk: unwrapValue }; } $f._entry = _entry; $f._i = _i; $f._key = _key; $f._keys = _keys; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f.key = key; $f.result = result; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.value = value; $f.$s = $s; $f.$r = $r; return $f;
 	};
+	ArgsResolver.prototype.Call = function(s, args) {
+		var _r, _r$1, ar, args, r, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; ar = $f.ar; args = $f.args; r = $f.r; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		ar = this.$val;
+		r = new Runner.ptr();
+		_r = r.ResolveArgs(s, args); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_r$1 = ar(_r); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		$s = -1; return _r$1;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: ArgsResolver.prototype.Call }; } $f._r = _r; $f._r$1 = _r$1; $f.ar = ar; $f.args = args; $f.r = r; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$ptrType(ArgsResolver).prototype.Call = function(s, args) { return new ArgsResolver(this.$get()).Call(s, args); };
 	newMapScope = function(parsed, base, r) {
 		var base, parsed, r;
 		return new mapScope.ptr($clone(parsed, parse.Map), base, r, false, false, $makeMap($emptyInterface.keyFor, []));
@@ -5434,8 +5604,8 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 	};
 	mapScope.prototype.Value = function() { return this.$val.Value(); };
 	mapScope.ptr.prototype.Get = function(key) {
-		var _entry, _entry$1, _entry$2, _entry$3, _key, _key$1, _r, _r$1, _r$2, _tuple, _tuple$1, idx, key, keys, ms, ok, v, x, $s, $deferred, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _entry$1 = $f._entry$1; _entry$2 = $f._entry$2; _entry$3 = $f._entry$3; _key = $f._key; _key$1 = $f._key$1; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; idx = $f.idx; key = $f.key; keys = $f.keys; ms = $f.ms; ok = $f.ok; v = $f.v; x = $f.x; $s = $f.$s; $deferred = $f.$deferred; $r = $f.$r; } var $err = null; try { s: while (true) { switch ($s) { case 0: $deferred = []; $deferred.index = $curGoroutine.deferStack.length; $curGoroutine.deferStack.push($deferred);
+		var _entry, _entry$1, _entry$2, _entry$3, _entry$4, _key, _key$1, _r, _r$1, _r$2, _tmp, _tmp$1, _tuple, _tuple$1, f, idx, key, keys, loc, ms, o, ok, v, val, x, x$1, x$2, x$3, $s, $deferred, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _entry$1 = $f._entry$1; _entry$2 = $f._entry$2; _entry$3 = $f._entry$3; _entry$4 = $f._entry$4; _key = $f._key; _key$1 = $f._key$1; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _tmp = $f._tmp; _tmp$1 = $f._tmp$1; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; f = $f.f; idx = $f.idx; key = $f.key; keys = $f.keys; loc = $f.loc; ms = $f.ms; o = $f.o; ok = $f.ok; v = $f.v; val = $f.val; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; x$3 = $f.x$3; $s = $f.$s; $deferred = $f.$deferred; $r = $f.$r; } var $err = null; try { s: while (true) { switch ($s) { case 0: $deferred = []; $deferred.index = $curGoroutine.deferStack.length; $curGoroutine.deferStack.push($deferred);
 		key = [key];
 		ms = [ms];
 		ms[0] = this;
@@ -5446,7 +5616,12 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 			$s = -1; return v;
 		}
 		if ((_entry$1 = ms[0].running[$emptyInterface.keyFor(key[0])], _entry$1 !== undefined ? _entry$1.v : false)) {
-			$s = -1; return new E($pkg.ErrInvalidRecursion);
+			loc = (x = ms[0].parsed.Pairs, x$1 = (_entry$2 = ms[0].keys[$emptyInterface.keyFor(key[0])], _entry$2 !== undefined ? _entry$2.v : 0), ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1])).Loc;
+			_tmp = loc.File;
+			_tmp$1 = loc.Offset;
+			f = _tmp;
+			o = _tmp$1;
+			$s = -1; return new ErrorStack.ptr("invalid recursion", f, o, $ifaceNil);
 		}
 		_key = key[0]; (ms[0].running || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: true };
 		$deferred.push([(function(key, ms) { return function() {
@@ -5454,7 +5629,7 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		}; })(key, ms), []]);
 		_r = ms[0].getKeys(); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 		keys = _r;
-		_tuple$1 = (_entry$2 = keys[$emptyInterface.keyFor(key[0])], _entry$2 !== undefined ? [_entry$2.v, true] : [0, false]);
+		_tuple$1 = (_entry$3 = keys[$emptyInterface.keyFor(key[0])], _entry$3 !== undefined ? [_entry$3.v, true] : [0, false]);
 		idx = _tuple$1[0];
 		ok = _tuple$1[1];
 		/* */ if (!ok) { $s = 2; continue; }
@@ -5466,10 +5641,11 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		if (ms[0].values === false) {
 			ms[0].values = $makeMap($emptyInterface.keyFor, []);
 		}
-		_r$2 = ms[0].Runner.Run(ms[0], $clone((x = ms[0].parsed.Pairs, ((idx < 0 || idx >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + idx])).Value, parse.Node)); /* */ $s = 5; case 5: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
-		_key$1 = key[0]; (ms[0].values || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key$1)] = { k: _key$1, v: _r$2 };
-		$s = -1; return (_entry$3 = ms[0].values[$emptyInterface.keyFor(key[0])], _entry$3 !== undefined ? _entry$3.v : $ifaceNil);
-		/* */ } return; } } catch(err) { $err = err; $s = -1; return $ifaceNil; } finally { $callDeferred($deferred, $err); if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: mapScope.ptr.prototype.Get }; } $f._entry = _entry; $f._entry$1 = _entry$1; $f._entry$2 = _entry$2; $f._entry$3 = _entry$3; $f._key = _key; $f._key$1 = _key$1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f.idx = idx; $f.key = key; $f.keys = keys; $f.ms = ms; $f.ok = ok; $f.v = v; $f.x = x; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
+		_r$2 = ms[0].Runner.Run(ms[0], $clone((x$2 = ms[0].parsed.Pairs, ((idx < 0 || idx >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + idx])).Value, parse.Node)); /* */ $s = 5; case 5: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+		val = _r$2;
+		_key$1 = key[0]; (ms[0].values || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key$1)] = { k: _key$1, v: WrapError(val, (x$3 = ms[0].parsed.Pairs, ((idx < 0 || idx >= x$3.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$3.$array[x$3.$offset + idx])).Loc) };
+		$s = -1; return (_entry$4 = ms[0].values[$emptyInterface.keyFor(key[0])], _entry$4 !== undefined ? _entry$4.v : $ifaceNil);
+		/* */ } return; } } catch(err) { $err = err; $s = -1; return $ifaceNil; } finally { $callDeferred($deferred, $err); if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: mapScope.ptr.prototype.Get }; } $f._entry = _entry; $f._entry$1 = _entry$1; $f._entry$2 = _entry$2; $f._entry$3 = _entry$3; $f._entry$4 = _entry$4; $f._key = _key; $f._key$1 = _key$1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f.f = f; $f.idx = idx; $f.key = key; $f.keys = keys; $f.loc = loc; $f.ms = ms; $f.o = o; $f.ok = ok; $f.v = v; $f.val = val; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
 	};
 	mapScope.prototype.Get = function(key) { return this.$val.Get(key); };
 	mapScope.ptr.prototype.getKeys = function() {
@@ -5494,59 +5670,91 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: mapScope.ptr.prototype.getKeys }; } $f._i = _i; $f._key = _key; $f._r = _r; $f._ref = _ref; $f.idx = idx; $f.ms = ms; $f.pp = pp; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	mapScope.prototype.getKeys = function() { return this.$val.getKeys(); };
-	E.methods = [{prop: "Error", name: "Error", pkg: "", typ: $funcType([], [$String], false)}];
-	ptrType$2.methods = [{prop: "Run", name: "Run", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "LazyRun", name: "LazyRun", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "run", name: "run", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "Eval", name: "Eval", pkg: "", typ: $funcType([Scope, $String, $String], [$emptyInterface], false)}];
-	ptrType$4.methods = [{prop: "Value", name: "Value", pkg: "", typ: $funcType([], [$emptyInterface], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "getKeys", name: "getKeys", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([], [mapType$1], false)}];
+	NewScope = function(maps, base) {
+		var _entry, _i, _i$1, _key, _keys, _ref, _ref$1, base, combined, k, maps, mm, v;
+		combined = $makeMap($emptyInterface.keyFor, []);
+		_ref = maps;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			mm = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (maps.$length === 1) {
+				return new scope.ptr(mm, base);
+			}
+			_ref$1 = mm;
+			_i$1 = 0;
+			_keys = $keys(_ref$1);
+			while (true) {
+				if (!(_i$1 < _keys.length)) { break; }
+				_entry = _ref$1[_keys[_i$1]];
+				if (_entry === undefined) {
+					_i$1++;
+					continue;
+				}
+				k = _entry.k;
+				v = _entry.v;
+				_key = k; (combined || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: v };
+				_i$1++;
+			}
+			_i++;
+		}
+		return new scope.ptr(combined, base);
+	};
+	$pkg.NewScope = NewScope;
+	scope.ptr.prototype.Get = function(key) {
+		var _entry, _r, _tuple, _tuple$1, key, ok, ok$1, s, s$1, v, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _r = $f._r; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; key = $f.key; ok = $f.ok; ok$1 = $f.ok$1; s = $f.s; s$1 = $f.s$1; v = $f.v; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		s = this;
+		_tuple = (_entry = s.mm[$emptyInterface.keyFor(key)], _entry !== undefined ? [_entry.v, true] : [$ifaceNil, false]);
+		v = _tuple[0];
+		ok = _tuple[1];
+		if (ok) {
+			$s = -1; return v;
+		}
+		if ($interfaceIsEqual(s.base, $ifaceNil)) {
+			_tuple$1 = $assertType(key, $String, true);
+			s$1 = _tuple$1[0];
+			ok$1 = _tuple$1[1];
+			if (ok$1) {
+				$s = -1; return new ErrorStack.ptr(s$1 + ": no such key", "", 0, $ifaceNil);
+			}
+			$s = -1; return new ErrorStack.ptr("No such key", "", 0, $ifaceNil);
+		}
+		_r = s.base.Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: scope.ptr.prototype.Get }; } $f._entry = _entry; $f._r = _r; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f.key = key; $f.ok = ok; $f.ok$1 = ok$1; $f.s = s; $f.s$1 = s$1; $f.v = v; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	scope.prototype.Get = function(key) { return this.$val.Get(key); };
+	ptrType.methods = [{prop: "Error", name: "Error", pkg: "", typ: $funcType([], [$String], false)}, {prop: "Stack", name: "Stack", pkg: "", typ: $funcType([], [$String], false)}, {prop: "format", name: "format", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([], [$String], false)}];
+	ptrType$3.methods = [{prop: "Run", name: "Run", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "LazyRun", name: "LazyRun", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "ResolveArgs", name: "ResolveArgs", pkg: "", typ: $funcType([Scope, sliceType$1], [sliceType], false)}, {prop: "run", name: "run", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "Eval", name: "Eval", pkg: "", typ: $funcType([Scope, $String, $String], [$emptyInterface], false)}];
+	ArgsResolver.methods = [{prop: "Call", name: "Call", pkg: "", typ: $funcType([Scope, sliceType$1], [$emptyInterface], false)}];
+	ptrType$5.methods = [{prop: "Value", name: "Value", pkg: "", typ: $funcType([], [$emptyInterface], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "getKeys", name: "getKeys", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([], [mapType$1], false)}];
+	ptrType$6.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
+	ErrorStack.init("", [{prop: "Message", name: "Message", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "File", name: "File", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "Offset", name: "Offset", anonymous: false, exported: true, typ: $Int, tag: ""}, {prop: "Inner", name: "Inner", anonymous: false, exported: true, typ: $error, tag: ""}]);
+	stackable.init([{prop: "Stack", name: "Stack", pkg: "", typ: $funcType([], [$String], false)}]);
 	Runner.init("", []);
+	ArgsResolver.init([sliceType], [$emptyInterface], false);
+	callable.init([{prop: "Call", name: "Call", pkg: "", typ: $funcType([Scope, sliceType$1], [$emptyInterface], false)}]);
 	Scope.init([{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}]);
 	Lazy.init([{prop: "Value", name: "Value", pkg: "", typ: $funcType([], [$emptyInterface], false)}]);
-	mapScope.init("github.com/funnelorg/funnel/run", [{prop: "parsed", name: "parsed", anonymous: false, exported: false, typ: parse.Map, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: Scope, tag: ""}, {prop: "Runner", name: "Runner", anonymous: true, exported: true, typ: ptrType$2, tag: ""}, {prop: "values", name: "values", anonymous: false, exported: false, typ: mapType, tag: ""}, {prop: "keys", name: "keys", anonymous: false, exported: false, typ: mapType$1, tag: ""}, {prop: "running", name: "running", anonymous: false, exported: false, typ: mapType$2, tag: ""}]);
+	mapScope.init("github.com/funnelorg/funnel/run", [{prop: "parsed", name: "parsed", anonymous: false, exported: false, typ: parse.Map, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: Scope, tag: ""}, {prop: "Runner", name: "Runner", anonymous: true, exported: true, typ: ptrType$3, tag: ""}, {prop: "values", name: "values", anonymous: false, exported: false, typ: mapType, tag: ""}, {prop: "keys", name: "keys", anonymous: false, exported: false, typ: mapType$1, tag: ""}, {prop: "running", name: "running", anonymous: false, exported: false, typ: mapType$2, tag: ""}]);
+	scope.init("github.com/funnelorg/funnel/run", [{prop: "mm", name: "mm", anonymous: false, exported: false, typ: mapType, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: Scope, tag: ""}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		$r = parse.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$pkg.ErrNotFunction = "not a function";
-		$pkg.ErrInvalidRecursion = "invalid recursion";
+		$r = strconv.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.$init = $init;
 	return $pkg;
 })();
-$packages["github.com/funnelorg/funnel/runtime"] = (function() {
-	var $pkg = {}, $init, errors, parse, run, strconv, rtscope, empty, invocation, Number, sliceType, funcType, ptrType, sliceType$1, sliceType$2, funcType$1, ptrType$1, mapType, def, x, Dot, Error, Fun, Num, Sum, Diff, Multiply, Divide, Function, NewScope, String;
-	errors = $packages["errors"];
+$packages["github.com/funnelorg/funnel/builtin"] = (function() {
+	var $pkg = {}, $init, parse, run, strconv, Number, callable, invocation, sliceType, funcType, mapType, sliceType$1, ptrType, ptrType$1, sliceType$2, ptrType$2, sliceType$3, ptrType$3, numberf, add, isMissingTerm, sub, mult, div, compare, more, less, gte, lte, equals, notEquals, and, or, dot, errorInternal, errorf, fun, iff, stringf;
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	run = $packages["github.com/funnelorg/funnel/run"];
 	strconv = $packages["strconv"];
-	rtscope = $pkg.rtscope = $newType(0, $kindStruct, "runtime.rtscope", true, "github.com/funnelorg/funnel/runtime", false, function(m_, base_) {
-		this.$val = this;
-		if (arguments.length === 0) {
-			this.m = false;
-			this.base = $ifaceNil;
-			return;
-		}
-		this.m = m_;
-		this.base = base_;
-	});
-	empty = $pkg.empty = $newType(0, $kindStruct, "runtime.empty", true, "github.com/funnelorg/funnel/runtime", false, function() {
-		this.$val = this;
-		if (arguments.length === 0) {
-			return;
-		}
-	});
-	invocation = $pkg.invocation = $newType(0, $kindStruct, "runtime.invocation", true, "github.com/funnelorg/funnel/runtime", false, function(params_, args_, s_) {
-		this.$val = this;
-		if (arguments.length === 0) {
-			this.params = sliceType$1.nil;
-			this.args = sliceType$2.nil;
-			this.s = $ifaceNil;
-			return;
-		}
-		this.params = params_;
-		this.args = args_;
-		this.s = s_;
-	});
-	Number = $pkg.Number = $newType(0, $kindStruct, "runtime.Number", true, "github.com/funnelorg/funnel/runtime", true, function(F_) {
+	Number = $pkg.Number = $newType(0, $kindStruct, "builtin.Number", true, "github.com/funnelorg/funnel/builtin", true, function(F_) {
 		this.$val = this;
 		if (arguments.length === 0) {
 			this.F = 0;
@@ -5554,36 +5762,370 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 		}
 		this.F = F_;
 	});
+	callable = $pkg.callable = $newType(0, $kindStruct, "builtin.callable", true, "github.com/funnelorg/funnel/builtin", false, function(params_, expr_, s_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.params = sliceType$2.nil;
+			this.expr = new parse.Node.ptr(ptrType.nil, ptrType$1.nil, ptrType$2.nil);
+			this.s = $ifaceNil;
+			return;
+		}
+		this.params = params_;
+		this.expr = expr_;
+		this.s = s_;
+	});
+	invocation = $pkg.invocation = $newType(0, $kindStruct, "builtin.invocation", true, "github.com/funnelorg/funnel/builtin", false, function(callable_, args_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.callable = ptrType$3.nil;
+			this.args = sliceType$3.nil;
+			return;
+		}
+		this.callable = callable_;
+		this.args = args_;
+	});
 	sliceType = $sliceType(parse.Node);
 	funcType = $funcType([run.Scope, sliceType], [$emptyInterface], false);
-	ptrType = $ptrType(parse.Token);
-	sliceType$1 = $sliceType($String);
-	sliceType$2 = $sliceType($emptyInterface);
-	funcType$1 = $funcType([sliceType$2], [$emptyInterface], true);
-	ptrType$1 = $ptrType(rtscope);
 	mapType = $mapType($emptyInterface, $emptyInterface);
-	rtscope.ptr.prototype.Get = function(key) {
-		var _entry, _r, _tuple, key, ok, r, v, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _r = $f._r; _tuple = $f._tuple; key = $f.key; ok = $f.ok; r = $f.r; v = $f.v; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		r = this;
-		_tuple = (_entry = r.m[$emptyInterface.keyFor(key)], _entry !== undefined ? [_entry.v, true] : [$ifaceNil, false]);
-		v = _tuple[0];
-		ok = _tuple[1];
-		if (ok) {
-			$s = -1; return v;
+	sliceType$1 = $sliceType(mapType);
+	ptrType = $ptrType(parse.Token);
+	ptrType$1 = $ptrType(parse.Call);
+	sliceType$2 = $sliceType($String);
+	ptrType$2 = $ptrType(parse.Map);
+	sliceType$3 = $sliceType($emptyInterface);
+	ptrType$3 = $ptrType(callable);
+	numberf = function(s, args) {
+		var _tuple, args, err, ff, s, x;
+		if (!((args.$length === 1))) {
+			return new run.ErrorStack.ptr("builtin:number: must have 1 arg", "", 0, $ifaceNil);
 		}
-		_r = r.base.Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		if ((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil) {
+			return new run.ErrorStack.ptr("builtin:number: must be a number", "", 0, $ifaceNil);
+		}
+		_tuple = strconv.ParseFloat((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S, 64);
+		ff = _tuple[0];
+		err = _tuple[1];
+		if (!($interfaceIsEqual(err, $ifaceNil))) {
+			return err;
+		}
+		return (x = new Number.ptr(ff), new x.constructor.elem(x));
+	};
+	add = function(s, args) {
+		var _i, _r, _ref, _ref$1, arg, args, e, r, s, sum, v, v$1, v$2, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; arg = $f.arg; args = $f.args; e = $f.e; r = $f.r; s = $f.s; sum = $f.sum; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		sum = 0;
+		r = new run.Runner.ptr();
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = r.Run(s, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, Number, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref$1, Number, true)[1]) { */ case 4:
+				v = $clone(_ref$1.$val, Number);
+				sum = sum + (v.F);
+				$s = 7; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 5:
+				v$1 = _ref$1;
+				$s = -1; return v$1;
+			/* } else { */ case 6:
+				v$2 = _ref$1;
+				e = new run.ErrorStack.ptr("not a number", "", 0, $ifaceNil);
+				$s = -1; return run.WrapError(e, $clone(arg, parse.Node).Loc());
+			/* } */ case 7:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return (x = new Number.ptr(sum), new x.constructor.elem(x));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: add }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.e = e; $f.r = r; $f.s = s; $f.sum = sum; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	isMissingTerm = function(arg) {
+		var arg, x;
+		return !(arg.Call === ptrType$1.nil) && $clone(arg.Call, parse.Call).IsError() && (x = arg.Call.Nodes, (1 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 1])).Token.S === "missing term";
+	};
+	sub = function(s, args) {
+		var _i, _r, _ref, _ref$1, arg, args, e, kk, r, s, sum, v, v$1, v$2, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; arg = $f.arg; args = $f.args; e = $f.e; kk = $f.kk; r = $f.r; s = $f.s; sum = $f.sum; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		sum = 0;
+		r = new run.Runner.ptr();
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			kk = _i;
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			/* */ if ((kk === 0) && isMissingTerm($clone(arg, parse.Node))) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if ((kk === 0) && isMissingTerm($clone(arg, parse.Node))) { */ case 3:
+				_i++;
+				/* continue; */ $s = 1; continue;
+			/* } */ case 4:
+			_r = r.Run(s, $clone(arg, parse.Node)); /* */ $s = 5; case 5: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, Number, true)[1]) { $s = 6; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 7; continue; }
+			/* */ $s = 8; continue;
+			/* if ($assertType(_ref$1, Number, true)[1]) { */ case 6:
+				v = $clone(_ref$1.$val, Number);
+				if (kk === 0) {
+					sum = v.F;
+				} else {
+					sum = sum - (v.F);
+				}
+				$s = 9; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 7:
+				v$1 = _ref$1;
+				$s = -1; return v$1;
+			/* } else { */ case 8:
+				v$2 = _ref$1;
+				e = new run.ErrorStack.ptr("not a number", "", 0, $ifaceNil);
+				$s = -1; return run.WrapError(e, $clone(arg, parse.Node).Loc());
+			/* } */ case 9:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return (x = new Number.ptr(sum), new x.constructor.elem(x));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: sub }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.e = e; $f.kk = kk; $f.r = r; $f.s = s; $f.sum = sum; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mult = function(s, args) {
+		var _i, _r, _ref, _ref$1, arg, args, e, r, result, s, v, v$1, v$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; arg = $f.arg; args = $f.args; e = $f.e; r = $f.r; result = $f.result; s = $f.s; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		result = new Number.ptr(1);
+		r = new run.Runner.ptr();
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = r.Run(s, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, Number, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref$1, Number, true)[1]) { */ case 4:
+				v = $clone(_ref$1.$val, Number);
+				result.F = result.F * v.F;
+				$s = 7; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 5:
+				v$1 = _ref$1;
+				$s = -1; return v$1;
+			/* } else { */ case 6:
+				v$2 = _ref$1;
+				e = new run.ErrorStack.ptr("not a number", "", 0, $ifaceNil);
+				$s = -1; return run.WrapError(e, $clone(arg, parse.Node).Loc());
+			/* } */ case 7:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return new result.constructor.elem(result);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: mult }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.e = e; $f.r = r; $f.result = result; $f.s = s; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	div = function(s, args) {
+		var _i, _r, _ref, _ref$1, arg, args, e, kk, r, result, s, v, v$1, v$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; arg = $f.arg; args = $f.args; e = $f.e; kk = $f.kk; r = $f.r; result = $f.result; s = $f.s; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		result = new Number.ptr(1);
+		r = new run.Runner.ptr();
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			kk = _i;
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = r.Run(s, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, Number, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref$1, Number, true)[1]) { */ case 4:
+				v = $clone(_ref$1.$val, Number);
+				if (kk === 0) {
+					Number.copy(result, v);
+				} else {
+					result.F = result.F / v.F;
+				}
+				$s = 7; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 5:
+				v$1 = _ref$1;
+				$s = -1; return v$1;
+			/* } else { */ case 6:
+				v$2 = _ref$1;
+				e = new run.ErrorStack.ptr("not a number", "", 0, $ifaceNil);
+				$s = -1; return run.WrapError(e, $clone(arg, parse.Node).Loc());
+			/* } */ case 7:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return new result.constructor.elem(result);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: div }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.e = e; $f.kk = kk; $f.r = r; $f.result = result; $f.s = s; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	compare = function(s, args, cmp) {
+		var _i, _r, _r$1, _ref, _ref$1, _v, arg, args, cmp, e, kk, last, r, s, v, v$1, v$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _ref = $f._ref; _ref$1 = $f._ref$1; _v = $f._v; arg = $f.arg; args = $f.args; cmp = $f.cmp; e = $f.e; kk = $f.kk; last = $f.last; r = $f.r; s = $f.s; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		last = new Number.ptr(0);
+		r = new run.Runner.ptr();
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			kk = _i;
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = r.Run(s, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, Number, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref$1, Number, true)[1]) { */ case 4:
+				v = $clone(_ref$1.$val, Number);
+				if (!(kk > 0)) { _v = false; $s = 10; continue s; }
+				_r$1 = cmp($clone(last, Number), $clone(v, Number)); /* */ $s = 11; case 11: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+				_v = !_r$1; case 10:
+				/* */ if (_v) { $s = 8; continue; }
+				/* */ $s = 9; continue;
+				/* if (_v) { */ case 8:
+					$s = -1; return new $Bool(false);
+				/* } */ case 9:
+				Number.copy(last, v);
+				$s = 7; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 5:
+				v$1 = _ref$1;
+				$s = -1; return v$1;
+			/* } else { */ case 6:
+				v$2 = _ref$1;
+				e = new run.ErrorStack.ptr("not a number", "", 0, $ifaceNil);
+				$s = -1; return run.WrapError(e, $clone(arg, parse.Node).Loc());
+			/* } */ case 7:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return new $Bool(true);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: compare }; } $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f._ref$1 = _ref$1; $f._v = _v; $f.arg = arg; $f.args = args; $f.cmp = cmp; $f.e = e; $f.kk = kk; $f.last = last; $f.r = r; $f.s = s; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	more = function(s, args) {
+		var _r, args, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = compare(s, args, (function(n1, n2) {
+			var n1, n2;
+			return n1.F > n2.F;
+		})); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 		$s = -1; return _r;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: rtscope.ptr.prototype.Get }; } $f._entry = _entry; $f._r = _r; $f._tuple = _tuple; $f.key = key; $f.ok = ok; $f.r = r; $f.v = v; $f.$s = $s; $f.$r = $r; return $f;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: more }; } $f._r = _r; $f.args = args; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
 	};
-	rtscope.prototype.Get = function(key) { return this.$val.Get(key); };
-	empty.ptr.prototype.Get = function(key) {
-		var e, key;
-		e = this;
-		return errors.New("no such key");
+	less = function(s, args) {
+		var _r, args, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = compare(s, args, (function(n1, n2) {
+			var n1, n2;
+			return n1.F < n2.F;
+		})); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: less }; } $f._r = _r; $f.args = args; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
 	};
-	empty.prototype.Get = function(key) { return this.$val.Get(key); };
-	Dot = function(s, args) {
+	gte = function(s, args) {
+		var _r, args, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = compare(s, args, (function(n1, n2) {
+			var n1, n2;
+			return n1.F >= n2.F;
+		})); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: gte }; } $f._r = _r; $f.args = args; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	lte = function(s, args) {
+		var _r, args, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = compare(s, args, (function(n1, n2) {
+			var n1, n2;
+			return n1.F <= n2.F;
+		})); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: lte }; } $f._r = _r; $f.args = args; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	equals = function(s, args) {
+		var _r, args, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = compare(s, args, (function(n1, n2) {
+			var n1, n2;
+			return n1.F === n2.F;
+		})); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: equals }; } $f._r = _r; $f.args = args; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	notEquals = function(s, args) {
+		var _r, args, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = compare(s, args, (function(n1, n2) {
+			var n1, n2;
+			return !((n1.F === n2.F));
+		})); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: notEquals }; } $f._r = _r; $f.args = args; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	and = function(s, args) {
+		var _i, _r, _ref, _ref$1, arg, args, e, r, s, t, t$1, t$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; arg = $f.arg; args = $f.args; e = $f.e; r = $f.r; s = $f.s; t = $f.t; t$1 = $f.t$1; t$2 = $f.t$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		r = new run.Runner.ptr();
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = r.Run(s, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, $Bool, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref$1, $Bool, true)[1]) { */ case 4:
+				t = _ref$1.$val;
+				if (!t) {
+					$s = -1; return new $Bool(false);
+				}
+				$s = 7; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 5:
+				t$1 = _ref$1;
+				$s = -1; return t$1;
+			/* } else { */ case 6:
+				t$2 = _ref$1;
+				e = new run.ErrorStack.ptr("not a condition", "", 0, $ifaceNil);
+				$s = -1; return run.WrapError(e, $clone(arg, parse.Node).Loc());
+			/* } */ case 7:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return new $Bool(true);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: and }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.e = e; $f.r = r; $f.s = s; $f.t = t; $f.t$1 = t$1; $f.t$2 = t$2; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	or = function(s, args) {
+		var _i, _r, _ref, _ref$1, arg, args, e, r, s, t, t$1, t$2, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; arg = $f.arg; args = $f.args; e = $f.e; r = $f.r; s = $f.s; t = $f.t; t$1 = $f.t$1; t$2 = $f.t$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		r = new run.Runner.ptr();
+		_ref = args;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			_r = r.Run(s, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, $Bool, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref$1, $Bool, true)[1]) { */ case 4:
+				t = _ref$1.$val;
+				if (t) {
+					$s = -1; return new $Bool(true);
+				}
+				$s = 7; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 5:
+				t$1 = _ref$1;
+				$s = -1; return t$1;
+			/* } else { */ case 6:
+				t$2 = _ref$1;
+				e = new run.ErrorStack.ptr("not a condition", "", 0, $ifaceNil);
+				$s = -1; return run.WrapError(e, $clone(arg, parse.Node).Loc());
+			/* } */ case 7:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return new $Bool(false);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: or }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.e = e; $f.r = r; $f.s = s; $f.t = t; $f.t$1 = t$1; $f.t$2 = t$2; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	dot = function(s, args) {
 		var _i, _r, _r$1, _r$2, _ref, _ref$1, _tuple, args, err, key, next, ok, r, result, s, sx, sx$1, sx$2, $s, $r;
 		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _ref$1 = $f._ref$1; _tuple = $f._tuple; args = $f.args; err = $f.err; key = $f.key; next = $f.next; ok = $f.ok; r = $f.r; result = $f.result; s = $f.s; sx = $f.sx; sx$1 = $f.sx$1; sx$2 = $f.sx$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		r = new run.Runner.ptr();
@@ -5624,367 +6166,179 @@ $packages["github.com/funnelorg/funnel/runtime"] = (function() {
 				$s = -1; return sx$1;
 			/* } else { */ case 10:
 				sx$2 = _ref$1;
-				$s = -1; return errors.New("cannot use dot with non-map");
+				$s = -1; return new run.ErrorStack.ptr("cannot use dot with non-map", "", 0, $ifaceNil);
 			/* } */ case 11:
 			_i++;
 		/* } */ $s = 2; continue; case 3:
 		$s = -1; return result;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Dot }; } $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.key = key; $f.next = next; $f.ok = ok; $f.r = r; $f.result = result; $f.s = s; $f.sx = sx; $f.sx$1 = sx$1; $f.sx$2 = sx$2; $f.$s = $s; $f.$r = $r; return $f;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: dot }; } $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.key = key; $f.next = next; $f.ok = ok; $f.r = r; $f.result = result; $f.s = s; $f.sx = sx; $f.sx$1 = sx$1; $f.sx$2 = sx$2; $f.$s = $s; $f.$r = $r; return $f;
 	};
-	$pkg.Dot = Dot;
-	Error = function(s, args) {
+	errorInternal = function(s, args) {
 		var args, s;
 		if (args.$length > 0 && !((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
-			return errors.New((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S);
+			return new run.ErrorStack.ptr((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S, "", 0, $ifaceNil);
 		}
-		return errors.New("error");
+		return new run.ErrorStack.ptr("unknown error", "", 0, $ifaceNil);
 	};
-	$pkg.Error = Error;
-	Fun = function(s, args) {
-		var _i, _ref, args, kk, n, params, s, x$1;
+	errorf = function(s, args) {
+		var _r, _ref, args, r, s, t, t$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; args = $f.args; r = $f.r; s = $f.s; t = $f.t; t$1 = $f.t$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		r = new run.Runner.ptr();
+		/* */ if (args.$length > 0) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (args.$length > 0) { */ case 1:
+			_r = r.Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref = _r;
+			/* */ if ($assertType(_ref, $error, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref, $String, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref, $error, true)[1]) { */ case 4:
+				t = _ref;
+				$s = -1; return new run.ErrorStack.ptr("", "", 0, t);
+			/* } else if ($assertType(_ref, $String, true)[1]) { */ case 5:
+				t$1 = _ref.$val;
+				$s = -1; return new run.ErrorStack.ptr(t$1, "", 0, $ifaceNil);
+			/* } */ case 6:
+		/* } */ case 2:
+		$s = -1; return new run.ErrorStack.ptr("unknown error", "", 0, $ifaceNil);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: errorf }; } $f._r = _r; $f._ref = _ref; $f.args = args; $f.r = r; $f.s = s; $f.t = t; $f.t$1 = t$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	fun = function(s, args) {
+		var _i, _ref, arg, args, e, expr, params, s, x;
 		if (args.$length === 0) {
 			return new funcType((function(s$1, args$1) {
 				var args$1, s$1;
 				return $ifaceNil;
 			}));
 		}
-		params = new sliceType$1([]);
+		params = new sliceType$2([]);
 		_ref = $subslice(args, 0, (args.$length - 1 >> 0));
 		_i = 0;
 		while (true) {
 			if (!(_i < _ref.$length)) { break; }
-			kk = _i;
-			if (((kk < 0 || kk >= args.$length) ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + kk]).Token === ptrType.nil) {
-				return errors.New("fun: invalid param name");
+			arg = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
+			if (arg.Token === ptrType.nil) {
+				e = new run.ErrorStack.ptr("fun: invalid param name", "", 0, $ifaceNil);
+				return run.WrapError(e, $clone(arg, parse.Node).Loc());
 			}
-			params = $append(params, ((kk < 0 || kk >= args.$length) ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + kk]).Token.S);
+			params = $append(params, arg.Token.S);
 			_i++;
 		}
-		n = $clone((x$1 = args.$length - 1 >> 0, ((x$1 < 0 || x$1 >= args.$length) ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + x$1])), parse.Node);
-		return new funcType((function $b(inner, args$1) {
-			var _i$1, _r, _r$1, _ref$1, arg, args$1, inner, inv, kk$1, r, values, $s, $r;
-			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i$1 = $f._i$1; _r = $f._r; _r$1 = $f._r$1; _ref$1 = $f._ref$1; arg = $f.arg; args$1 = $f.args$1; inner = $f.inner; inv = $f.inv; kk$1 = $f.kk$1; r = $f.r; values = $f.values; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-			r = new run.Runner.ptr();
-			values = $makeSlice(sliceType$2, args$1.$length);
-			_ref$1 = args$1;
-			_i$1 = 0;
-			/* while (true) { */ case 1:
-				/* if (!(_i$1 < _ref$1.$length)) { break; } */ if(!(_i$1 < _ref$1.$length)) { $s = 2; continue; }
-				kk$1 = _i$1;
-				arg = $clone(((_i$1 < 0 || _i$1 >= _ref$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref$1.$array[_ref$1.$offset + _i$1]), parse.Node);
-				_r = r.LazyRun(inner, $clone(arg, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-				((kk$1 < 0 || kk$1 >= values.$length) ? ($throwRuntimeError("index out of range"), undefined) : values.$array[values.$offset + kk$1] = _r);
-				_i$1++;
-			/* } */ $s = 1; continue; case 2:
-			inv = new invocation.ptr(params, values, s);
-			_r$1 = r.LazyRun(new inv.constructor.elem(inv), $clone(n, parse.Node)); /* */ $s = 4; case 4: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
-			$s = -1; return _r$1;
-			/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f._i$1 = _i$1; $f._r = _r; $f._r$1 = _r$1; $f._ref$1 = _ref$1; $f.arg = arg; $f.args$1 = args$1; $f.inner = inner; $f.inv = inv; $f.kk$1 = kk$1; $f.r = r; $f.values = values; $f.$s = $s; $f.$r = $r; return $f;
-		}));
+		expr = $clone((x = args.$length - 1 >> 0, ((x < 0 || x >= args.$length) ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + x])), parse.Node);
+		return new callable.ptr(params, $clone(expr, parse.Node), s);
 	};
-	$pkg.Fun = Fun;
+	callable.ptr.prototype.Call = function(s, args) {
+		var _r, _r$1, args, c, r, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; args = $f.args; c = $f.c; r = $f.r; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		c = this;
+		r = new run.Runner.ptr();
+		_r = r.ResolveArgs(s, args); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_r$1 = c.CallResolved(_r); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		$s = -1; return _r$1;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: callable.ptr.prototype.Call }; } $f._r = _r; $f._r$1 = _r$1; $f.args = args; $f.c = c; $f.r = r; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	callable.prototype.Call = function(s, args) { return this.$val.Call(s, args); };
+	callable.ptr.prototype.CallResolved = function(args) {
+		var _r, args, c, r, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; c = $f.c; r = $f.r; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		c = this;
+		r = new run.Runner.ptr();
+		_r = r.LazyRun(new invocation.ptr(c, args), $clone(c.expr, parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: callable.ptr.prototype.CallResolved }; } $f._r = _r; $f.args = args; $f.c = c; $f.r = r; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	callable.prototype.CallResolved = function(args) { return this.$val.CallResolved(args); };
 	invocation.ptr.prototype.Get = function(key) {
-		var _i, _r, _ref, _tuple, i, key, kk, ok, param, str, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _tuple = $f._tuple; i = $f.i; key = $f.key; kk = $f.kk; ok = $f.ok; param = $f.param; str = $f.str; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		var _i, _r, _ref, _tuple, i, key, kk, ok, param, str, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _tuple = $f._tuple; i = $f.i; key = $f.key; kk = $f.kk; ok = $f.ok; param = $f.param; str = $f.str; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		i = this;
 		_tuple = $assertType(key, $String, true);
 		str = _tuple[0];
 		ok = _tuple[1];
 		if (ok) {
-			_ref = i.params;
+			_ref = i.callable.params;
 			_i = 0;
 			while (true) {
 				if (!(_i < _ref.$length)) { break; }
 				kk = _i;
 				param = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
 				if (param === str) {
-					$s = -1; return (x$1 = i.args, ((kk < 0 || kk >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + kk]));
+					$s = -1; return (x = i.args, ((kk < 0 || kk >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + kk]));
 				}
 				_i++;
 			}
 		}
-		_r = i.s.Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_r = i.callable.s.Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 		$s = -1; return _r;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: invocation.ptr.prototype.Get }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._tuple = _tuple; $f.i = i; $f.key = key; $f.kk = kk; $f.ok = ok; $f.param = param; $f.str = str; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: invocation.ptr.prototype.Get }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._tuple = _tuple; $f.i = i; $f.key = key; $f.kk = kk; $f.ok = ok; $f.param = param; $f.str = str; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	invocation.prototype.Get = function(key) { return this.$val.Get(key); };
-	Num = function(s, args) {
-		var _r, _ref, _tuple, args, err, f, f$1, ff, result, s, x$1, x$2, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; _tuple = $f._tuple; args = $f.args; err = $f.err; f = $f.f; f$1 = $f.f$1; ff = $f.ff; result = $f.result; s = $f.s; x$1 = $f.x$1; x$2 = $f.x$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		if (!((args.$length === 1))) {
-			$s = -1; return errors.New("num: incorrect number of args");
-		}
-		if (!((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
-			_tuple = strconv.ParseFloat((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S, 64);
-			ff = _tuple[0];
-			err = _tuple[1];
-			if ($interfaceIsEqual(err, $ifaceNil)) {
-				$s = -1; return (x$1 = new Number.ptr(ff), new x$1.constructor.elem(x$1));
-			}
-			$s = -1; return err;
-		}
-		_r = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		result = _r;
-		_ref = result;
-		if ($assertType(_ref, $Float64, true)[1]) {
-			f = _ref.$val;
-			$s = -1; return (x$2 = new Number.ptr(f), new x$2.constructor.elem(x$2));
-		} else if ($assertType(_ref, Number, true)[1] || $assertType(_ref, $error, true)[1]) {
-			f$1 = _ref;
-			$s = -1; return result;
-		}
-		$s = -1; return errors.New("num: invalid arg type");
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Num }; } $f._r = _r; $f._ref = _ref; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.f = f; $f.f$1 = f$1; $f.ff = ff; $f.result = result; $f.s = s; $f.x$1 = x$1; $f.x$2 = x$2; $f.$s = $s; $f.$r = $r; return $f;
-	};
-	$pkg.Num = Num;
-	Sum = function(s, args) {
-		var _i, _r, _ref, _ref$1, args, f, f$1, f$2, f$3, n, result, s, sum, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; n = $f.n; result = $f.result; s = $f.s; sum = $f.sum; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		sum = 0;
-		_ref = args;
-		_i = 0;
-		/* while (true) { */ case 1:
-			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
-			n = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
-			_r = (new run.Runner.ptr()).Run(s, $clone(n, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-			result = _r;
-			_ref$1 = result;
-			if ($assertType(_ref$1, $Float64, true)[1]) {
-				f = _ref$1.$val;
-				sum = sum + (f);
-			} else if ($assertType(_ref$1, Number, true)[1]) {
-				f$1 = $clone(_ref$1.$val, Number);
-				sum = sum + (f$1.F);
-			} else if ($assertType(_ref$1, $error, true)[1]) {
-				f$2 = _ref$1;
-				$s = -1; return result;
-			} else {
-				f$3 = _ref$1;
-				$s = -1; return errors.New("sum: not a number");
-			}
-			_i++;
-		/* } */ $s = 1; continue; case 2:
-		$s = -1; return (x$1 = new Number.ptr(sum), new x$1.constructor.elem(x$1));
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Sum }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.n = n; $f.result = result; $f.s = s; $f.sum = sum; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
-	};
-	$pkg.Sum = Sum;
-	Diff = function(s, args) {
-		var _i, _r, _ref, _ref$1, args, f, f$1, f$2, f$3, factor, n, result, s, sum, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; factor = $f.factor; n = $f.n; result = $f.result; s = $f.s; sum = $f.sum; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		sum = 0;
-		factor = 1;
-		_ref = args;
-		_i = 0;
-		/* while (true) { */ case 1:
-			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
-			n = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
-			_r = (new run.Runner.ptr()).Run(s, $clone(n, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-			result = _r;
-			_ref$1 = result;
-			if ($assertType(_ref$1, $Float64, true)[1]) {
-				f = _ref$1.$val;
-				sum = sum + (factor * f);
-			} else if ($assertType(_ref$1, Number, true)[1]) {
-				f$1 = $clone(_ref$1.$val, Number);
-				sum = sum + (factor * f$1.F);
-			} else if ($assertType(_ref$1, $error, true)[1]) {
-				f$2 = _ref$1;
-				$s = -1; return result;
-			} else {
-				f$3 = _ref$1;
-				$s = -1; return errors.New("diff: not a number");
-			}
-			factor = -1;
-			_i++;
-		/* } */ $s = 1; continue; case 2:
-		$s = -1; return (x$1 = new Number.ptr(sum), new x$1.constructor.elem(x$1));
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Diff }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.factor = factor; $f.n = n; $f.result = result; $f.s = s; $f.sum = sum; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
-	};
-	$pkg.Diff = Diff;
-	Multiply = function(s, args) {
-		var _i, _r, _ref, _ref$1, args, f, f$1, f$2, f$3, n, product, result, s, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; n = $f.n; product = $f.product; result = $f.result; s = $f.s; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		product = 1;
-		_ref = args;
-		_i = 0;
-		/* while (true) { */ case 1:
-			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
-			n = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
-			_r = (new run.Runner.ptr()).Run(s, $clone(n, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-			result = _r;
-			_ref$1 = result;
-			if ($assertType(_ref$1, $Float64, true)[1]) {
-				f = _ref$1.$val;
-				product = product * f;
-			} else if ($assertType(_ref$1, Number, true)[1]) {
-				f$1 = $clone(_ref$1.$val, Number);
-				product = product * f$1.F;
-			} else if ($assertType(_ref$1, $error, true)[1]) {
-				f$2 = _ref$1;
-				$s = -1; return result;
-			} else {
-				f$3 = _ref$1;
-				$s = -1; return errors.New("mult: not a number");
-			}
-			_i++;
-		/* } */ $s = 1; continue; case 2:
-		$s = -1; return (x$1 = new Number.ptr(product), new x$1.constructor.elem(x$1));
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Multiply }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.n = n; $f.product = product; $f.result = result; $f.s = s; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
-	};
-	$pkg.Multiply = Multiply;
-	Divide = function(s, args) {
-		var _i, _r, _ref, _ref$1, args, f, f$1, f$2, f$3, item, kk, n, product, result, s, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; f$3 = $f.f$3; item = $f.item; kk = $f.kk; n = $f.n; product = $f.product; result = $f.result; s = $f.s; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		product = 1;
-		_ref = args;
-		_i = 0;
-		/* while (true) { */ case 1:
-			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
-			kk = _i;
-			n = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), parse.Node);
-			_r = (new run.Runner.ptr()).Run(s, $clone(n, parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-			result = _r;
-			item = 1;
-			_ref$1 = result;
-			if ($assertType(_ref$1, $Float64, true)[1]) {
-				f = _ref$1.$val;
-				item = f;
-			} else if ($assertType(_ref$1, Number, true)[1]) {
-				f$1 = $clone(_ref$1.$val, Number);
-				item = f$1.F;
-			} else if ($assertType(_ref$1, $error, true)[1]) {
-				f$2 = _ref$1;
-				$s = -1; return result;
-			} else {
-				f$3 = _ref$1;
-				$s = -1; return errors.New("div: not a number");
-			}
-			if (kk === 0) {
-				product = item;
-			} else {
-				product = product / item;
-			}
-			_i++;
-		/* } */ $s = 1; continue; case 2:
-		$s = -1; return (x$1 = new Number.ptr(product), new x$1.constructor.elem(x$1));
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Divide }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.f$3 = f$3; $f.item = item; $f.kk = kk; $f.n = n; $f.product = product; $f.result = result; $f.s = s; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
-	};
-	$pkg.Divide = Divide;
-	Function = function(fn) {
-		var _tuple, f, fn, ok, r;
-		_tuple = $assertType(fn, funcType, true);
-		f = _tuple[0];
-		ok = _tuple[1];
-		if (ok) {
-			return f;
+	iff = function(s, args) {
+		var _r, _r$1, _ref, args, cond, cond$1, r, result, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _ref = $f._ref; args = $f.args; cond = $f.cond; cond$1 = $f.cond$1; r = $f.r; result = $f.result; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (args.$length <= 1) {
+			$s = -1; return new run.ErrorStack.ptr("if: requires 2 or 3 args", "", 0, $ifaceNil);
 		}
 		r = new run.Runner.ptr();
-		return (function $b(s, args) {
-			var _i, _r, _r$1, _ref, args, kk, output, s, v, $s, $deferred, $r;
-			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _ref = $f._ref; args = $f.args; kk = $f.kk; output = $f.output; s = $f.s; v = $f.v; $s = $f.$s; $deferred = $f.$deferred; $r = $f.$r; } var $err = null; try { s: while (true) { switch ($s) { case 0: $deferred = []; $deferred.index = $curGoroutine.deferStack.length; $curGoroutine.deferStack.push($deferred);
-			output = [output];
-			output[0] = $ifaceNil;
-			$deferred.push([(function(output) { return function() {
-				var r$1;
-				r$1 = $recover();
-				if (!($interfaceIsEqual(r$1, $ifaceNil))) {
-					output[0] = errors.New("invalid function call");
+		_r = r.Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_ref = _r;
+		/* */ if ($assertType(_ref, $Bool, true)[1]) { $s = 2; continue; }
+		/* */ if ($assertType(_ref, $error, true)[1]) { $s = 3; continue; }
+		/* */ $s = 4; continue;
+		/* if ($assertType(_ref, $Bool, true)[1]) { */ case 2:
+			cond = _ref.$val;
+			result = $clone((1 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 1]), parse.Node);
+			if (!cond) {
+				if (args.$length < 3) {
+					$s = -1; return new run.ErrorStack.ptr("if: no else value", "", 0, $ifaceNil);
 				}
-			}; })(output), []]);
-			v = $makeSlice(sliceType$2, args.$length);
-			_ref = args;
-			_i = 0;
-			/* while (true) { */ case 1:
-				/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
-				kk = _i;
-				_r = r.LazyRun(s, $clone(((kk < 0 || kk >= args.$length) ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + kk]), parse.Node)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-				((kk < 0 || kk >= v.$length) ? ($throwRuntimeError("index out of range"), undefined) : v.$array[v.$offset + kk] = _r);
-				_i++;
-			/* } */ $s = 1; continue; case 2:
-			_r$1 = $assertType(fn, funcType$1)(v); /* */ $s = 4; case 4: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
-			output[0] = _r$1;
-			$s = -1; return output[0];
-			/* */ } return; } } catch(err) { $err = err; $s = -1; } finally { $callDeferred($deferred, $err); if (!$curGoroutine.asleep) { return  output[0]; } if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: $b }; } $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f.args = args; $f.kk = kk; $f.output = output; $f.s = s; $f.v = v; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
-		});
-	};
-	$pkg.Function = Function;
-	NewScope = function(m, base) {
-		var _entry, _i, _key, _key$1, _keys, _ref, _tuple, base, k, m, ok, v, wrapped;
-		wrapped = $makeMap($emptyInterface.keyFor, []);
-		_ref = m;
-		_i = 0;
-		_keys = $keys(_ref);
-		while (true) {
-			if (!(_i < _keys.length)) { break; }
-			_entry = _ref[_keys[_i]];
-			if (_entry === undefined) {
-				_i++;
-				continue;
+				parse.Node.copy(result, (2 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 2]));
 			}
-			k = _entry.k;
-			v = _entry.v;
-			_key = k; (wrapped || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: v };
-			_tuple = $assertType(v, funcType$1, true);
-			ok = _tuple[1];
-			if (ok) {
-				_key$1 = k; (wrapped || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key$1)] = { k: _key$1, v: new funcType(Function(v)) };
-			}
-			_i++;
-		}
-		return new rtscope.ptr(wrapped, base);
+			_r$1 = r.Run(s, $clone(result, parse.Node)); /* */ $s = 5; case 5: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			$s = -1; return _r$1;
+		/* } else if ($assertType(_ref, $error, true)[1]) { */ case 3:
+			cond$1 = _ref;
+			$s = -1; return cond$1;
+		/* } */ case 4:
+		$s = -1; return new run.ErrorStack.ptr("if: not a valid condition", "", 0, $ifaceNil);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: iff }; } $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f.args = args; $f.cond = cond; $f.cond$1 = cond$1; $f.r = r; $f.result = result; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
 	};
-	$pkg.NewScope = NewScope;
-	String = function(s, args) {
-		var _r, _ref, args, result, s, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; args = $f.args; result = $f.result; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		if (!((args.$length === 1))) {
-			$s = -1; return errors.New("string: incorrect number of args");
+	stringf = function(s, args) {
+		var args, s;
+		if (args.$length > 0 && !((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
+			return new $String((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S);
 		}
-		if (!((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token === ptrType.nil)) {
-			$s = -1; return new $String((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]).Token.S);
-		}
-		_r = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		result = _r;
-		_ref = result;
-		if ($assertType(_ref, $String, true)[1] || $assertType(_ref, $error, true)[1]) {
-			$s = -1; return result;
-		}
-		$s = -1; return errors.New("string: invalid arg type");
-		/* */ } return; } if ($f === undefined) { $f = { $blk: String }; } $f._r = _r; $f._ref = _ref; $f.args = args; $f.result = result; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+		return new run.ErrorStack.ptr("unknown error", "", 0, $ifaceNil);
 	};
-	$pkg.String = String;
-	ptrType$1.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
-	empty.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
+	ptrType$3.methods = [{prop: "Call", name: "Call", pkg: "", typ: $funcType([run.Scope, sliceType], [$emptyInterface], false)}, {prop: "CallResolved", name: "CallResolved", pkg: "", typ: $funcType([sliceType$3], [$emptyInterface], false)}];
 	invocation.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
-	rtscope.init("github.com/funnelorg/funnel/runtime", [{prop: "m", name: "m", anonymous: false, exported: false, typ: mapType, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: run.Scope, tag: ""}]);
-	empty.init("", []);
-	invocation.init("github.com/funnelorg/funnel/runtime", [{prop: "params", name: "params", anonymous: false, exported: false, typ: sliceType$1, tag: ""}, {prop: "args", name: "args", anonymous: false, exported: false, typ: sliceType$2, tag: ""}, {prop: "s", name: "s", anonymous: false, exported: false, typ: run.Scope, tag: ""}]);
 	Number.init("", [{prop: "F", name: "F", anonymous: false, exported: true, typ: $Float64, tag: ""}]);
+	callable.init("github.com/funnelorg/funnel/builtin", [{prop: "params", name: "params", anonymous: false, exported: false, typ: sliceType$2, tag: ""}, {prop: "expr", name: "expr", anonymous: false, exported: false, typ: parse.Node, tag: ""}, {prop: "s", name: "s", anonymous: false, exported: false, typ: run.Scope, tag: ""}]);
+	invocation.init("github.com/funnelorg/funnel/builtin", [{prop: "callable", name: "callable", anonymous: true, exported: false, typ: ptrType$3, tag: ""}, {prop: "args", name: "args", anonymous: false, exported: false, typ: sliceType$3, tag: ""}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		$r = errors.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = strconv.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		def = $makeMap($emptyInterface.keyFor, [{ k: new $String("!"), v: new funcType(Error) }, { k: new $String("."), v: new funcType(Dot) }, { k: new $String("+"), v: new funcType(Sum) }, { k: new $String("-"), v: new funcType(Diff) }, { k: new $String("*"), v: new funcType(Multiply) }, { k: new $String("/"), v: new funcType(Divide) }, { k: new $String("builtin:number"), v: new funcType(Num) }, { k: new $String("builtin:string"), v: new funcType(String) }, { k: new $String("fun"), v: new funcType(Fun) }]);
-		$pkg.DefaultScope = NewScope(def, (x = new empty.ptr(), new x.constructor.elem(x)));
+		$r = parse.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strconv.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("!"), v: new funcType(errorInternal) }, { k: new $String("+"), v: new funcType(add) }, { k: new $String("-"), v: new funcType(sub) }, { k: new $String("*"), v: new funcType(mult) }, { k: new $String("/"), v: new funcType(div) }, { k: new $String(">"), v: new funcType(more) }, { k: new $String(">="), v: new funcType(gte) }, { k: new $String("<"), v: new funcType(less) }, { k: new $String("<="), v: new funcType(lte) }, { k: new $String("=="), v: new funcType(equals) }, { k: new $String("!="), v: new funcType(notEquals) }, { k: new $String("|"), v: new funcType(or) }, { k: new $String("&"), v: new funcType(and) }, { k: new $String("if"), v: new funcType(iff) }, { k: new $String("."), v: new funcType(dot) }, { k: new $String("builtin:string"), v: new funcType(stringf) }, { k: new $String("builtin:number"), v: new funcType(numberf) }, { k: new $String("or"), v: new funcType(or) }, { k: new $String("and"), v: new funcType(and) }, { k: new $String("error"), v: new funcType(errorf) }, { k: new $String("fun"), v: new funcType(fun) }]);
+		$pkg.Scope = run.NewScope(new sliceType$1([$pkg.Map]), $ifaceNil);
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.$init = $init;
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel"] = (function() {
-	var $pkg = {}, $init, parse, run, runtime, Eval;
+	var $pkg = {}, $init, builtin, parse, run, Eval;
+	builtin = $packages["github.com/funnelorg/funnel/builtin"];
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	run = $packages["github.com/funnelorg/funnel/run"];
-	runtime = $packages["github.com/funnelorg/funnel/runtime"];
 	Eval = function(s, filename, code) {
 		var _r, code, filename, r, s, $s, $r;
 		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; code = $f.code; filename = $f.filename; r = $f.r; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		r = new run.Runner.ptr();
 		if ($interfaceIsEqual(s, $ifaceNil)) {
-			s = runtime.DefaultScope;
+			s = builtin.Scope;
 		}
 		_r = r.Run(s, $clone(parse.Parse(filename, code), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 		$s = -1; return _r;
@@ -5994,128 +6348,401 @@ $packages["github.com/funnelorg/funnel"] = (function() {
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		$r = parse.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = run.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = runtime.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = builtin.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.$init = $init;
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/math"] = (function() {
-	var $pkg = {}, $init, errors, parse, run, runtime, math, sliceType, funcType, New, Square, Root;
-	errors = $packages["errors"];
-	parse = $packages["github.com/funnelorg/funnel/parse"];
+	var $pkg = {}, $init, builtin, run, math, mapType, sliceType, Scope, square, root;
+	builtin = $packages["github.com/funnelorg/funnel/builtin"];
 	run = $packages["github.com/funnelorg/funnel/run"];
-	runtime = $packages["github.com/funnelorg/funnel/runtime"];
 	math = $packages["math"];
-	sliceType = $sliceType(parse.Node);
-	funcType = $funcType([run.Scope, sliceType], [$emptyInterface], false);
-	New = function() {
-		var _r, _r$1, m, math$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; m = $f.m; math$1 = $f.math$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		m = $makeMap($emptyInterface.keyFor, [{ k: new $String("square"), v: new funcType(Square) }, { k: new $String("root"), v: new funcType(Root) }]);
-		_r = runtime.NewScope(m, runtime.DefaultScope); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		math$1 = $makeMap($emptyInterface.keyFor, [{ k: new $String("math"), v: _r }]);
-		_r$1 = runtime.NewScope(math$1, runtime.DefaultScope); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
-		$s = -1; return _r$1;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: New }; } $f._r = _r; $f._r$1 = _r$1; $f.m = m; $f.math$1 = math$1; $f.$s = $s; $f.$r = $r; return $f;
+	mapType = $mapType($emptyInterface, $emptyInterface);
+	sliceType = $sliceType(mapType);
+	Scope = function(base) {
+		var base;
+		return run.NewScope(new sliceType([$pkg.Map]), base);
 	};
-	$pkg.New = New;
-	Square = function(s, args) {
-		var _r, _ref, args, f, f$1, f$2, result, s, x, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; result = $f.result; s = $f.s; x = $f.x; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+	$pkg.Scope = Scope;
+	square = function(args) {
+		var _ref, args, f, f$1, x;
 		if (!((args.$length === 1))) {
-			$s = -1; return errors.New("square: must have exactly 1 arg");
+			return new run.ErrorStack.ptr("math:square: must have exactly 1 arg", "", 0, $ifaceNil);
 		}
-		_r = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		result = _r;
-		_ref = result;
-		if ($assertType(_ref, $Float64, true)[1]) {
-			f = _ref.$val;
-			$s = -1; return (x = new runtime.Number.ptr(f * f), new x.constructor.elem(x));
-		} else if ($assertType(_ref, runtime.Number, true)[1]) {
-			f$1 = $clone(_ref.$val, runtime.Number);
-			$s = -1; return (x$1 = new runtime.Number.ptr(f$1.F * f$1.F), new x$1.constructor.elem(x$1));
+		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
+		if ($assertType(_ref, builtin.Number, true)[1]) {
+			f = $clone(_ref.$val, builtin.Number);
+			return (x = new builtin.Number.ptr(f.F * f.F), new x.constructor.elem(x));
 		} else if ($assertType(_ref, $error, true)[1]) {
-			f$2 = _ref;
-			$s = -1; return result;
+			f$1 = _ref;
+			return f$1;
 		}
-		$s = -1; return errors.New("square: not a number");
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Square }; } $f._r = _r; $f._ref = _ref; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.result = result; $f.s = s; $f.x = x; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+		return new run.ErrorStack.ptr("math:square: not a number", "", 0, $ifaceNil);
 	};
-	$pkg.Square = Square;
-	Root = function(s, args) {
-		var _r, _ref, args, f, f$1, f$2, result, s, x, x$1, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; args = $f.args; f = $f.f; f$1 = $f.f$1; f$2 = $f.f$2; result = $f.result; s = $f.s; x = $f.x; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+	root = function(args) {
+		var _ref, args, f, f$1, x;
 		if (!((args.$length === 1))) {
-			$s = -1; return errors.New("root: must have exactly 1 arg");
+			return new run.ErrorStack.ptr("math:root: must have exactly 1 arg", "", 0, $ifaceNil);
 		}
-		_r = (new run.Runner.ptr()).Run(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		result = _r;
-		_ref = result;
-		if ($assertType(_ref, $Float64, true)[1]) {
-			f = _ref.$val;
-			$s = -1; return (x = new runtime.Number.ptr(math.Sqrt(f)), new x.constructor.elem(x));
-		} else if ($assertType(_ref, runtime.Number, true)[1]) {
-			f$1 = $clone(_ref.$val, runtime.Number);
-			$s = -1; return (x$1 = new runtime.Number.ptr(math.Sqrt(f$1.F)), new x$1.constructor.elem(x$1));
+		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
+		if ($assertType(_ref, builtin.Number, true)[1]) {
+			f = $clone(_ref.$val, builtin.Number);
+			return (x = new builtin.Number.ptr(math.Sqrt(f.F)), new x.constructor.elem(x));
 		} else if ($assertType(_ref, $error, true)[1]) {
-			f$2 = _ref;
-			$s = -1; return result;
+			f$1 = _ref;
+			return f$1;
 		}
-		$s = -1; return errors.New("root: not a number");
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Root }; } $f._r = _r; $f._ref = _ref; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.f$2 = f$2; $f.result = result; $f.s = s; $f.x = x; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+		return new run.ErrorStack.ptr("math:root: not a number", "", 0, $ifaceNil);
 	};
-	$pkg.Root = Root;
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = builtin.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = math.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("math:square"), v: new run.ArgsResolver((square)) }, { k: new $String("math:root"), v: new run.ArgsResolver((root)) }]);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["honnef.co/go/js/util"] = (function() {
+	var $pkg = {}, $init, js, EventTarget, ptrType, funcType;
+	js = $packages["github.com/gopherjs/gopherjs/js"];
+	EventTarget = $pkg.EventTarget = $newType(0, $kindStruct, "util.EventTarget", true, "honnef.co/go/js/util", true, function(Object_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Object = null;
+			return;
+		}
+		this.Object = Object_;
+	});
+	ptrType = $ptrType(js.Object);
+	funcType = $funcType([ptrType], [], false);
+	EventTarget.ptr.prototype.AddEventListener = function(typ, useCapture, listener) {
+		var listener, t, typ, useCapture;
+		t = this;
+		t.Object.addEventListener($externalize(typ, $String), $externalize(listener, funcType), $externalize(useCapture, $Bool));
+	};
+	EventTarget.prototype.AddEventListener = function(typ, useCapture, listener) { return this.$val.AddEventListener(typ, useCapture, listener); };
+	EventTarget.ptr.prototype.RemoveEventListener = function(typ, useCapture, listener) {
+		var listener, t, typ, useCapture;
+		t = this;
+		t.Object.removeEventListener($externalize(typ, $String), $externalize(listener, funcType), $externalize(useCapture, $Bool));
+	};
+	EventTarget.prototype.RemoveEventListener = function(typ, useCapture, listener) { return this.$val.RemoveEventListener(typ, useCapture, listener); };
+	EventTarget.methods = [{prop: "AddEventListener", name: "AddEventListener", pkg: "", typ: $funcType([$String, $Bool, funcType], [], false)}, {prop: "RemoveEventListener", name: "RemoveEventListener", pkg: "", typ: $funcType([$String, $Bool, funcType], [], false)}];
+	EventTarget.init("", [{prop: "Object", name: "Object", anonymous: true, exported: true, typ: ptrType, tag: ""}]);
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = js.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["honnef.co/go/js/xhr"] = (function() {
+	var $pkg = {}, $init, errors, js, util, Request, Upload, ptrType, ptrType$1, ptrType$2, chanType, NewRequest;
+	errors = $packages["errors"];
+	js = $packages["github.com/gopherjs/gopherjs/js"];
+	util = $packages["honnef.co/go/js/util"];
+	Request = $pkg.Request = $newType(0, $kindStruct, "xhr.Request", true, "honnef.co/go/js/xhr", true, function(Object_, EventTarget_, ReadyState_, Response_, ResponseText_, ResponseType_, ResponseXML_, Status_, StatusText_, Timeout_, WithCredentials_, ch_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Object = null;
+			this.EventTarget = new util.EventTarget.ptr(null);
+			this.ReadyState = 0;
+			this.Response = null;
+			this.ResponseText = "";
+			this.ResponseType = "";
+			this.ResponseXML = null;
+			this.Status = 0;
+			this.StatusText = "";
+			this.Timeout = 0;
+			this.WithCredentials = false;
+			this.ch = $chanNil;
+			return;
+		}
+		this.Object = Object_;
+		this.EventTarget = EventTarget_;
+		this.ReadyState = ReadyState_;
+		this.Response = Response_;
+		this.ResponseText = ResponseText_;
+		this.ResponseType = ResponseType_;
+		this.ResponseXML = ResponseXML_;
+		this.Status = Status_;
+		this.StatusText = StatusText_;
+		this.Timeout = Timeout_;
+		this.WithCredentials = WithCredentials_;
+		this.ch = ch_;
+	});
+	Upload = $pkg.Upload = $newType(0, $kindStruct, "xhr.Upload", true, "honnef.co/go/js/xhr", true, function(Object_, EventTarget_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Object = null;
+			this.EventTarget = new util.EventTarget.ptr(null);
+			return;
+		}
+		this.Object = Object_;
+		this.EventTarget = EventTarget_;
+	});
+	ptrType = $ptrType(Upload);
+	ptrType$1 = $ptrType(Request);
+	ptrType$2 = $ptrType(js.Object);
+	chanType = $chanType($error, false, false);
+	Request.ptr.prototype.Upload = function() {
+		var o, r;
+		r = this;
+		o = r.Object.upload;
+		return new Upload.ptr(o, new util.EventTarget.ptr(o));
+	};
+	Request.prototype.Upload = function() { return this.$val.Upload(); };
+	NewRequest = function(method, url) {
+		var method, o, r, url;
+		o = new ($global.XMLHttpRequest)();
+		r = new Request.ptr(o, new util.EventTarget.ptr(o), 0, null, "", "", null, 0, "", 0, false, $chanNil);
+		r.Object.open($externalize(method, $String), $externalize(url, $String), $externalize(true, $Bool));
+		return r;
+	};
+	$pkg.NewRequest = NewRequest;
+	Request.ptr.prototype.ResponseHeaders = function() {
+		var r;
+		r = this;
+		return $internalize(r.Object.getAllResponseHeaders(), $String);
+	};
+	Request.prototype.ResponseHeaders = function() { return this.$val.ResponseHeaders(); };
+	Request.ptr.prototype.ResponseHeader = function(name) {
+		var name, r, value;
+		r = this;
+		value = r.Object.getResponseHeader($externalize(name, $String));
+		if (value === null) {
+			return "";
+		}
+		return $internalize(value, $String);
+	};
+	Request.prototype.ResponseHeader = function(name) { return this.$val.ResponseHeader(name); };
+	Request.ptr.prototype.Abort = function() {
+		var _selection, r, $r;
+		/* */ var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _selection = $f._selection; r = $f.r; $r = $f.$r; }
+		r = this;
+		if (r.ch === $chanNil) {
+			return;
+		}
+		r.Object.abort();
+		_selection = $select([[r.ch, $pkg.ErrAborted], []]);
+		if (_selection[0] === 0) {
+		} else if (_selection[0] === 1) {
+		}
+		/* */ if ($f === undefined) { $f = { $blk: Request.ptr.prototype.Abort }; } $f._selection = _selection; $f.r = r; $f.$r = $r; return $f;
+	};
+	Request.prototype.Abort = function() { return this.$val.Abort(); };
+	Request.ptr.prototype.OverrideMimeType = function(mimetype) {
+		var mimetype, r;
+		r = this;
+		r.Object.overrideMimeType($externalize(mimetype, $String));
+	};
+	Request.prototype.OverrideMimeType = function(mimetype) { return this.$val.OverrideMimeType(mimetype); };
+	Request.ptr.prototype.Send = function(data) {
+		var _r, data, r, val, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; data = $f.data; r = $f.r; val = $f.val; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		r = [r];
+		r[0] = this;
+		if (!(r[0].ch === $chanNil)) {
+			$panic(new $String("must not use a Request for multiple requests"));
+		}
+		r[0].ch = new $Chan($error, 1);
+		$clone(r[0].EventTarget, util.EventTarget).AddEventListener("load", false, (function(r) { return function(param) {
+			var param;
+			$go((function(r) { return function $b() {
+				var $s, $r;
+				/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+				$r = $send(r[0].ch, $ifaceNil); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+				$s = -1; return;
+				/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f.$s = $s; $f.$r = $r; return $f;
+			}; })(r), []);
+		}; })(r));
+		$clone(r[0].EventTarget, util.EventTarget).AddEventListener("error", false, (function(r) { return function(o) {
+			var o;
+			$go((function(r) { return function $b() {
+				var $s, $r;
+				/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+				$r = $send(r[0].ch, $pkg.ErrFailure); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+				$s = -1; return;
+				/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f.$s = $s; $f.$r = $r; return $f;
+			}; })(r), []);
+		}; })(r));
+		$clone(r[0].EventTarget, util.EventTarget).AddEventListener("timeout", false, (function(r) { return function(param) {
+			var param;
+			$go((function(r) { return function $b() {
+				var $s, $r;
+				/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+				$r = $send(r[0].ch, $pkg.ErrTimeout); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+				$s = -1; return;
+				/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f.$s = $s; $f.$r = $r; return $f;
+			}; })(r), []);
+		}; })(r));
+		r[0].Object.send($externalize(data, $emptyInterface));
+		_r = $recv(r[0].ch); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		val = _r[0];
+		$s = -1; return val;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Request.ptr.prototype.Send }; } $f._r = _r; $f.data = data; $f.r = r; $f.val = val; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Request.prototype.Send = function(data) { return this.$val.Send(data); };
+	Request.ptr.prototype.SetRequestHeader = function(header, value) {
+		var header, r, value;
+		r = this;
+		r.Object.setRequestHeader($externalize(header, $String), $externalize(value, $String));
+	};
+	Request.prototype.SetRequestHeader = function(header, value) { return this.$val.SetRequestHeader(header, value); };
+	ptrType$1.methods = [{prop: "Upload", name: "Upload", pkg: "", typ: $funcType([], [ptrType], false)}, {prop: "ResponseHeaders", name: "ResponseHeaders", pkg: "", typ: $funcType([], [$String], false)}, {prop: "ResponseHeader", name: "ResponseHeader", pkg: "", typ: $funcType([$String], [$String], false)}, {prop: "Abort", name: "Abort", pkg: "", typ: $funcType([], [], false)}, {prop: "OverrideMimeType", name: "OverrideMimeType", pkg: "", typ: $funcType([$String], [], false)}, {prop: "Send", name: "Send", pkg: "", typ: $funcType([$emptyInterface], [$error], false)}, {prop: "SetRequestHeader", name: "SetRequestHeader", pkg: "", typ: $funcType([$String, $String], [], false)}];
+	Request.init("honnef.co/go/js/xhr", [{prop: "Object", name: "Object", anonymous: true, exported: true, typ: ptrType$2, tag: ""}, {prop: "EventTarget", name: "EventTarget", anonymous: true, exported: true, typ: util.EventTarget, tag: ""}, {prop: "ReadyState", name: "ReadyState", anonymous: false, exported: true, typ: $Int, tag: "js:\"readyState\""}, {prop: "Response", name: "Response", anonymous: false, exported: true, typ: ptrType$2, tag: "js:\"response\""}, {prop: "ResponseText", name: "ResponseText", anonymous: false, exported: true, typ: $String, tag: "js:\"responseText\""}, {prop: "ResponseType", name: "ResponseType", anonymous: false, exported: true, typ: $String, tag: "js:\"responseType\""}, {prop: "ResponseXML", name: "ResponseXML", anonymous: false, exported: true, typ: ptrType$2, tag: "js:\"responseXML\""}, {prop: "Status", name: "Status", anonymous: false, exported: true, typ: $Int, tag: "js:\"status\""}, {prop: "StatusText", name: "StatusText", anonymous: false, exported: true, typ: $String, tag: "js:\"statusText\""}, {prop: "Timeout", name: "Timeout", anonymous: false, exported: true, typ: $Int, tag: "js:\"timeout\""}, {prop: "WithCredentials", name: "WithCredentials", anonymous: false, exported: true, typ: $Bool, tag: "js:\"withCredentials\""}, {prop: "ch", name: "ch", anonymous: false, exported: false, typ: chanType, tag: ""}]);
+	Upload.init("", [{prop: "Object", name: "Object", anonymous: true, exported: true, typ: ptrType$2, tag: ""}, {prop: "EventTarget", name: "EventTarget", anonymous: true, exported: true, typ: util.EventTarget, tag: ""}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		$r = errors.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = runtime.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = math.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = js.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = util.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.ErrAborted = errors.New("request aborted");
+		$pkg.ErrTimeout = errors.New("request timed out");
+		$pkg.ErrFailure = errors.New("send failed");
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["github.com/funnelorg/funnel/url"] = (function() {
+	var $pkg = {}, $init, parse, run, xhr, URL, mapType, sliceType, sliceType$1, funcType, Scope, urlf;
+	parse = $packages["github.com/funnelorg/funnel/parse"];
+	run = $packages["github.com/funnelorg/funnel/run"];
+	xhr = $packages["honnef.co/go/js/xhr"];
+	URL = $pkg.URL = $newType(8, $kindString, "url.URL", true, "github.com/funnelorg/funnel/url", true, null);
+	mapType = $mapType($emptyInterface, $emptyInterface);
+	sliceType = $sliceType(mapType);
+	sliceType$1 = $sliceType(parse.Node);
+	funcType = $funcType([run.Scope, sliceType$1], [$emptyInterface], false);
+	URL.prototype.json = function(s, args) {
+		var _r, args, err, req, s, u, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; args = $f.args; err = $f.err; req = $f.req; s = $f.s; u = $f.u; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		u = this.$val;
+		req = xhr.NewRequest("GET", (u));
+		req.Object.timeout = 1000;
+		req.Object.responseType = $externalize("json", $String);
+		_r = req.Send($ifaceNil); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		err = _r;
+		if (!($interfaceIsEqual(err, $ifaceNil))) {
+			$s = -1; return err;
+		}
+		$s = -1; return $internalize(req.Object.response, $emptyInterface);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: URL.prototype.json }; } $f._r = _r; $f.args = args; $f.err = err; $f.req = req; $f.s = s; $f.u = u; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$ptrType(URL).prototype.json = function(s, args) { return new URL(this.$get()).json(s, args); };
+	Scope = function(base) {
+		var base;
+		return run.NewScope(new sliceType([$pkg.Map]), base);
+	};
+	$pkg.Scope = Scope;
+	urlf = function(args) {
+		var _ref, args, f, f$1, f$2;
+		if (!((args.$length === 1))) {
+			return new run.ErrorStack.ptr("url: requires exactly 1 arg", "", 0, $ifaceNil);
+		}
+		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
+		if ($assertType(_ref, $String, true)[1]) {
+			f = _ref.$val;
+			return new URL((f));
+		} else if ($assertType(_ref, URL, true)[1]) {
+			f$1 = _ref.$val;
+			return new URL(f$1);
+		} else if ($assertType(_ref, $error, true)[1]) {
+			f$2 = _ref;
+			return f$2;
+		}
+		return new run.ErrorStack.ptr("url: not a string", "", 0, $ifaceNil);
+	};
+	URL.prototype.Get = function(key) {
+		var key, u;
+		u = this.$val;
+		if (!($interfaceIsEqual(key, new $String("json")))) {
+			return new run.ErrorStack.ptr("no such key", "", 0, $ifaceNil);
+		}
+		return new funcType($methodVal(new URL(u), "json"));
+	};
+	$ptrType(URL).prototype.Get = function(key) { return new URL(this.$get()).Get(key); };
+	URL.methods = [{prop: "json", name: "json", pkg: "github.com/funnelorg/funnel/url", typ: $funcType([run.Scope, sliceType$1], [$emptyInterface], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = parse.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = xhr.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("url"), v: new run.ArgsResolver((urlf)) }]);
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.$init = $init;
 	return $pkg;
 })();
 $packages["github.com/funnelorg/playground"] = (function() {
-	var $pkg = {}, $init, funnel, math, js, mapType, funcType, Eval, main;
+	var $pkg = {}, $init, funnel, builtin, math, url, js, stackable, mapType, funcType, funcType$1, Eval, main;
 	funnel = $packages["github.com/funnelorg/funnel"];
+	builtin = $packages["github.com/funnelorg/funnel/builtin"];
 	math = $packages["github.com/funnelorg/funnel/math"];
+	url = $packages["github.com/funnelorg/funnel/url"];
 	js = $packages["github.com/gopherjs/gopherjs/js"];
+	stackable = $pkg.stackable = $newType(8, $kindInterface, "main.stackable", true, "github.com/funnelorg/playground", false, null);
 	mapType = $mapType($String, $emptyInterface);
-	funcType = $funcType([$String], [$emptyInterface], false);
-	Eval = function(code) {
-		var _r, _r$1, _r$2, _tuple, code, err, ok, result, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _tuple = $f._tuple; code = $f.code; err = $f.err; ok = $f.ok; result = $f.result; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		_r = math.New(); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-		_r$1 = funnel.Eval(_r, "browser", code); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
-		result = _r$1;
-		_tuple = $assertType(result, $error, true);
-		err = _tuple[0];
-		ok = _tuple[1];
-		/* */ if (ok) { $s = 3; continue; }
-		/* */ $s = 4; continue;
-		/* if (ok) { */ case 3:
-			_r$2 = err.Error(); /* */ $s = 5; case 5: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
-			$s = -1; return new mapType($makeMap($String.keyFor, [{ k: "Error", v: new $String(_r$2) }]));
-		/* } */ case 4:
-		$s = -1; return result;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: Eval }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tuple = _tuple; $f.code = code; $f.err = err; $f.ok = ok; $f.result = result; $f.$s = $s; $f.$r = $r; return $f;
+	funcType = $funcType([$emptyInterface], [], false);
+	funcType$1 = $funcType([$String, funcType], [], false);
+	Eval = function(code, done) {
+		var code, done;
+		$go((function $b() {
+			var _r, _r$1, _r$2, _tuple, _tuple$1, err, ok, ok$1, result, s, $s, $r;
+			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; err = $f.err; ok = $f.ok; ok$1 = $f.ok$1; result = $f.result; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_r = funnel.Eval(url.Scope(math.Scope(builtin.Scope)), "browser", code); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			result = _r;
+			_tuple = $assertType(result, stackable, true);
+			s = _tuple[0];
+			ok = _tuple[1];
+			/* */ if (ok) { $s = 2; continue; }
+			/* */ $s = 3; continue;
+			/* if (ok) { */ case 2:
+				_r$1 = s.Stack(); /* */ $s = 5; case 5: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+				result = new $String(_r$1);
+				$s = 4; continue;
+			/* } else { */ case 3:
+				_tuple$1 = $assertType(result, $error, true);
+				err = _tuple$1[0];
+				ok$1 = _tuple$1[1];
+				/* */ if (ok$1) { $s = 6; continue; }
+				/* */ $s = 7; continue;
+				/* if (ok$1) { */ case 6:
+					_r$2 = err.Error(); /* */ $s = 8; case 8: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+					result = new mapType($makeMap($String.keyFor, [{ k: "Error", v: new $String(_r$2) }]));
+				/* } */ case 7:
+			/* } */ case 4:
+			$r = done(result); /* */ $s = 9; case 9: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			$s = -1; return;
+			/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f.err = err; $f.ok = ok; $f.ok$1 = ok$1; $f.result = result; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+		}), []);
 	};
 	$pkg.Eval = Eval;
 	main = function() {
-		$global.Funnel = $externalize($makeMap($String.keyFor, [{ k: "Eval", v: new funcType(Eval) }]), mapType);
+		$global.Funnel = $externalize($makeMap($String.keyFor, [{ k: "Eval", v: new funcType$1(Eval) }]), mapType);
 	};
+	stackable.init([{prop: "Stack", name: "Stack", pkg: "", typ: $funcType([], [$String], false)}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		$r = funnel.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = math.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = js.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = builtin.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = math.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = url.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = js.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		if ($pkg === $mainPkg) {
 			main();
 			$mainFinished = true;

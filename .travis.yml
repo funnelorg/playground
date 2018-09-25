@@ -11,7 +11,7 @@ install:
   - node --version
   - go version
   - go get -u github.com/gopherjs/gopherjs
-  - go get -u github.com/funnelorg/funnel  
+  - go get -u -tags=js github.com/funnelorg/funnel/...
   - npm install source-map-support
 
 script:
