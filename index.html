@@ -45,6 +45,17 @@
         <button>&#9654; Run</button> <span class="output">Output</span>
       </div>
     </div>
+    <h3>Features</h3>
+      <ul>
+        <li>Infix expressions: <code>x + y()</code></li>
+        <li>Map expressions: <code>{y = x + 1, x = 22}.y</code></li>
+        <li>If/Then/Else: <code>if(i > 2, i, i*2)</code>
+        <li>Functions: <code>{x = fun(z, z+1), y = x(2)}.y</code></li>
+        <li>Lists and maps: <code>{x = data:list(1, 2, 3), y = data:map{z = 42}}</code></li>
+        <li>Filter, Map support on lists: <code>data:list(1, 2, 3).map(fun(i, v, v*2))</code></li>
+        <li>Fetching JSON from url: <code>url(string "https://api.myjson.com/bins/ngfbw").json()</code></li>
+          
+      </ul>
     <h3> Examples </h3>
     <div>
       <p> Funnel expresions can include the standard binary operators: <code>+-/*</code></p>

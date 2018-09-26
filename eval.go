@@ -15,18 +15,34 @@ import (
 
 func Eval(code string, done func(interface{})) {
 	go func() {
-		result := funnel.Eval(url.Scope(math.Scope(builtin.Scope)), "browser", code)
-		if s, ok := result.(stackable); ok {
-			result = s.Stack()
-		} else if err, ok := result.(error); ok {
-			result = map[string]interface{}{"Error": err.Error()}
-		}
-		done(result)
+		done(format(funnel.Eval(url.Scope(math.Scope(builtin.Scope)), "browser", code)))
 	}()
+}
+
+func format(v interface{}) interface{} {
+	switch v := v.(type) {
+	case stackable:
+		return v.Stack()
+	case error:
+		return v.Error()
+	case scopeWithKeys:
+		result := map[interface{}]interface{}{}
+		v.ForEachKeys(func(key interface{}) bool {
+			result[key] = format(v.Get(key))
+			return false
+		})
+		return result
+	}
+	return v
 }
 
 type stackable interface {
 	Stack() string
+}
+
+type scopeWithKeys interface {
+	Get(interface{}) interface{}
+	ForEachKeys(fn func(interface{}) bool)
 }
 
 func main() {
