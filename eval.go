@@ -8,14 +8,17 @@ package main
 import (
 	"github.com/funnelorg/funnel"
 	"github.com/funnelorg/funnel/builtin"
+	"github.com/funnelorg/funnel/data"
 	"github.com/funnelorg/funnel/math"
 	"github.com/funnelorg/funnel/url"
 	"github.com/gopherjs/gopherjs/js"
 )
 
+var s = data.Scope(url.Scope(math.Scope(builtin.Scope)))
+
 func Eval(code string, done func(interface{})) {
 	go func() {
-		done(format(funnel.Eval(url.Scope(math.Scope(builtin.Scope)), "browser", code)))
+		done(format(funnel.Eval(s, "browser", code)))
 	}()
 }
 
