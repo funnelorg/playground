@@ -4766,9 +4766,11 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 			if (op.S === "{") {
 				s.Push(new Token.ptr(op.Loc, "}"));
 				missingTerm = false;
+				kk = s.ops.$length - 1 >> 0;
 			} else if (op.S === "(") {
 				s.Push(new Token.ptr(op.Loc, ")"));
 				missingTerm = false;
+				kk = s.ops.$length - 1 >> 0;
 			}
 			kk = kk - (1) >> 0;
 		}
@@ -5297,7 +5299,7 @@ $packages["github.com/funnelorg/funnel/parse"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/run"] = (function() {
-	var $pkg = {}, $init, parse, strconv, ErrorStack, stackable, Runner, ArgsResolver, callable, Scope, Lazy, mapScope, scope, ptrType, sliceType, ptrType$1, ptrType$2, sliceType$1, funcType, mapType, ptrType$3, ptrType$4, sliceType$2, mapType$1, ptrType$5, mapType$2, ptrType$6, WrapError, unwrapValue, newMapScope, NewScope;
+	var $pkg = {}, $init, parse, strconv, ErrorStack, stackable, Runner, ArgsResolver, callable, Scope, Lazy, mapScope, scope, ptrType, sliceType, ptrType$1, ptrType$2, sliceType$1, funcType, ptrType$3, ptrType$4, sliceType$2, funcType$1, mapType, ptrType$5, mapType$1, mapType$2, ptrType$6, WrapError, unwrapValue, newMapScope, NewScope;
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	strconv = $packages["strconv"];
 	ErrorStack = $pkg.ErrorStack = $newType(0, $kindStruct, "run.ErrorStack", true, "github.com/funnelorg/funnel/run", true, function(Message_, File_, Offset_, Inner_) {
@@ -5359,12 +5361,13 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 	ptrType$2 = $ptrType(parse.Map);
 	sliceType$1 = $sliceType(parse.Node);
 	funcType = $funcType([Scope, sliceType$1], [$emptyInterface], false);
-	mapType = $mapType($emptyInterface, $emptyInterface);
 	ptrType$3 = $ptrType(Runner);
 	ptrType$4 = $ptrType(parse.Loc);
 	sliceType$2 = $sliceType(parse.Pair);
-	mapType$1 = $mapType($emptyInterface, $Int);
+	funcType$1 = $funcType([$emptyInterface], [$Bool], false);
+	mapType = $mapType($emptyInterface, $Int);
 	ptrType$5 = $ptrType(mapScope);
+	mapType$1 = $mapType($emptyInterface, $emptyInterface);
 	mapType$2 = $mapType($emptyInterface, $Bool);
 	ptrType$6 = $ptrType(scope);
 	ErrorStack.ptr.prototype.Error = function() {
@@ -5528,40 +5531,20 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 	};
 	Runner.prototype.Eval = function(s, fname, str) { return this.$val.Eval(s, fname, str); };
 	unwrapValue = function(v) {
-		var _entry, _i, _key, _keys, _r, _r$1, _r$2, _ref, _ref$1, key, result, v, v$1, v$2, value, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _i = $f._i; _key = $f._key; _keys = $f._keys; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _ref$1 = $f._ref$1; key = $f.key; result = $f.result; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; value = $f.value; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		_ref = v;
-		/* */ if ($assertType(_ref, Lazy, true)[1]) { $s = 1; continue; }
-		/* */ if ($assertType(_ref, mapType, true)[1]) { $s = 2; continue; }
-		/* */ $s = 3; continue;
-		/* if ($assertType(_ref, Lazy, true)[1]) { */ case 1:
-			v$1 = _ref;
-			_r = v$1.Value(); /* */ $s = 4; case 4: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-			_r$1 = unwrapValue(_r); /* */ $s = 5; case 5: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		var _r, _r$1, _tuple, l, ok, v, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _tuple = $f._tuple; l = $f.l; ok = $f.ok; v = $f.v; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_tuple = $assertType(v, Lazy, true);
+		l = _tuple[0];
+		ok = _tuple[1];
+		/* */ if (ok) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (ok) { */ case 1:
+			_r = l.Value(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_r$1 = unwrapValue(_r); /* */ $s = 4; case 4: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
 			$s = -1; return _r$1;
-		/* } else if ($assertType(_ref, mapType, true)[1]) { */ case 2:
-			v$2 = _ref.$val;
-			result = $makeMap($emptyInterface.keyFor, []);
-			_ref$1 = v$2;
-			_i = 0;
-			_keys = $keys(_ref$1);
-			/* while (true) { */ case 6:
-				/* if (!(_i < _keys.length)) { break; } */ if(!(_i < _keys.length)) { $s = 7; continue; }
-				_entry = _ref$1[_keys[_i]];
-				if (_entry === undefined) {
-					_i++;
-					/* continue; */ $s = 6; continue;
-				}
-				key = _entry.k;
-				value = _entry.v;
-				_r$2 = unwrapValue(value); /* */ $s = 8; case 8: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
-				_key = key; (result || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: _r$2 };
-				_i++;
-			/* } */ $s = 6; continue; case 7:
-			$s = -1; return new mapType(result);
-		/* } */ case 3:
+		/* } */ case 2:
 		$s = -1; return v;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: unwrapValue }; } $f._entry = _entry; $f._i = _i; $f._key = _key; $f._keys = _keys; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f.key = key; $f.result = result; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.value = value; $f.$s = $s; $f.$r = $r; return $f;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: unwrapValue }; } $f._r = _r; $f._r$1 = _r$1; $f._tuple = _tuple; $f.l = l; $f.ok = ok; $f.v = v; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	ArgsResolver.prototype.Call = function(s, args) {
 		var _r, _r$1, ar, args, r, s, $s, $r;
@@ -5599,7 +5582,7 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 			_key = key; (result || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: _r$1 };
 			_i++;
 		/* } */ $s = 2; continue; case 3:
-		$s = -1; return new mapType(result);
+		$s = -1; return new scope.ptr(result, ms.base);
 		/* */ } return; } if ($f === undefined) { $f = { $blk: mapScope.ptr.prototype.Value }; } $f._entry = _entry; $f._i = _i; $f._key = _key; $f._keys = _keys; $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f.key = key; $f.ms = ms; $f.result = result; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	mapScope.prototype.Value = function() { return this.$val.Value(); };
@@ -5648,6 +5631,34 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		/* */ } return; } } catch(err) { $err = err; $s = -1; return $ifaceNil; } finally { $callDeferred($deferred, $err); if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: mapScope.ptr.prototype.Get }; } $f._entry = _entry; $f._entry$1 = _entry$1; $f._entry$2 = _entry$2; $f._entry$3 = _entry$3; $f._entry$4 = _entry$4; $f._key = _key; $f._key$1 = _key$1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f.f = f; $f.idx = idx; $f.key = key; $f.keys = keys; $f.loc = loc; $f.ms = ms; $f.o = o; $f.ok = ok; $f.v = v; $f.val = val; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
 	};
 	mapScope.prototype.Get = function(key) { return this.$val.Get(key); };
+	mapScope.ptr.prototype.ForEachKeys = function(fn) {
+		var _entry, _i, _keys, _r, _r$1, _ref, fn, key, ms, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _i = $f._i; _keys = $f._keys; _r = $f._r; _r$1 = $f._r$1; _ref = $f._ref; fn = $f.fn; key = $f.key; ms = $f.ms; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		ms = this;
+		_r = ms.getKeys(); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_ref = _r;
+		_i = 0;
+		_keys = $keys(_ref);
+		/* while (true) { */ case 2:
+			/* if (!(_i < _keys.length)) { break; } */ if(!(_i < _keys.length)) { $s = 3; continue; }
+			_entry = _ref[_keys[_i]];
+			if (_entry === undefined) {
+				_i++;
+				/* continue; */ $s = 2; continue;
+			}
+			key = _entry.k;
+			_r$1 = fn(key); /* */ $s = 6; case 6: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			/* */ if (_r$1) { $s = 4; continue; }
+			/* */ $s = 5; continue;
+			/* if (_r$1) { */ case 4:
+				/* break; */ $s = 3; continue;
+			/* } */ case 5:
+			_i++;
+		/* } */ $s = 2; continue; case 3:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: mapScope.ptr.prototype.ForEachKeys }; } $f._entry = _entry; $f._i = _i; $f._keys = _keys; $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f.fn = fn; $f.key = key; $f.ms = ms; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mapScope.prototype.ForEachKeys = function(fn) { return this.$val.ForEachKeys(fn); };
 	mapScope.ptr.prototype.getKeys = function() {
 		var _i, _key, _r, _ref, idx, ms, pp, $s, $r;
 		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _key = $f._key; _r = $f._r; _ref = $f._ref; idx = $f.idx; ms = $f.ms; pp = $f.pp; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -5725,11 +5736,38 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: scope.ptr.prototype.Get }; } $f._entry = _entry; $f._r = _r; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f.key = key; $f.ok = ok; $f.ok$1 = ok$1; $f.s = s; $f.s$1 = s$1; $f.v = v; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	scope.prototype.Get = function(key) { return this.$val.Get(key); };
+	scope.ptr.prototype.ForEachKeys = function(fn) {
+		var _entry, _i, _keys, _r, _ref, fn, key, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _entry = $f._entry; _i = $f._i; _keys = $f._keys; _r = $f._r; _ref = $f._ref; fn = $f.fn; key = $f.key; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		s = this;
+		_ref = s.mm;
+		_i = 0;
+		_keys = $keys(_ref);
+		/* while (true) { */ case 1:
+			/* if (!(_i < _keys.length)) { break; } */ if(!(_i < _keys.length)) { $s = 2; continue; }
+			_entry = _ref[_keys[_i]];
+			if (_entry === undefined) {
+				_i++;
+				/* continue; */ $s = 1; continue;
+			}
+			key = _entry.k;
+			_r = fn(key); /* */ $s = 5; case 5: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			/* */ if (_r) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (_r) { */ case 3:
+				/* break; */ $s = 2; continue;
+			/* } */ case 4:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: scope.ptr.prototype.ForEachKeys }; } $f._entry = _entry; $f._i = _i; $f._keys = _keys; $f._r = _r; $f._ref = _ref; $f.fn = fn; $f.key = key; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	scope.prototype.ForEachKeys = function(fn) { return this.$val.ForEachKeys(fn); };
 	ptrType.methods = [{prop: "Error", name: "Error", pkg: "", typ: $funcType([], [$String], false)}, {prop: "Stack", name: "Stack", pkg: "", typ: $funcType([], [$String], false)}, {prop: "format", name: "format", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([], [$String], false)}];
 	ptrType$3.methods = [{prop: "Run", name: "Run", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "LazyRun", name: "LazyRun", pkg: "", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "ResolveArgs", name: "ResolveArgs", pkg: "", typ: $funcType([Scope, sliceType$1], [sliceType], false)}, {prop: "run", name: "run", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([Scope, parse.Node], [$emptyInterface], false)}, {prop: "Eval", name: "Eval", pkg: "", typ: $funcType([Scope, $String, $String], [$emptyInterface], false)}];
 	ArgsResolver.methods = [{prop: "Call", name: "Call", pkg: "", typ: $funcType([Scope, sliceType$1], [$emptyInterface], false)}];
-	ptrType$5.methods = [{prop: "Value", name: "Value", pkg: "", typ: $funcType([], [$emptyInterface], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "getKeys", name: "getKeys", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([], [mapType$1], false)}];
-	ptrType$6.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
+	ptrType$5.methods = [{prop: "Value", name: "Value", pkg: "", typ: $funcType([], [$emptyInterface], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "ForEachKeys", name: "ForEachKeys", pkg: "", typ: $funcType([funcType$1], [], false)}, {prop: "getKeys", name: "getKeys", pkg: "github.com/funnelorg/funnel/run", typ: $funcType([], [mapType], false)}];
+	ptrType$6.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "ForEachKeys", name: "ForEachKeys", pkg: "", typ: $funcType([funcType$1], [], false)}];
 	ErrorStack.init("", [{prop: "Message", name: "Message", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "File", name: "File", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "Offset", name: "Offset", anonymous: false, exported: true, typ: $Int, tag: ""}, {prop: "Inner", name: "Inner", anonymous: false, exported: true, typ: $error, tag: ""}]);
 	stackable.init([{prop: "Stack", name: "Stack", pkg: "", typ: $funcType([], [$String], false)}]);
 	Runner.init("", []);
@@ -5737,8 +5775,8 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 	callable.init([{prop: "Call", name: "Call", pkg: "", typ: $funcType([Scope, sliceType$1], [$emptyInterface], false)}]);
 	Scope.init([{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}]);
 	Lazy.init([{prop: "Value", name: "Value", pkg: "", typ: $funcType([], [$emptyInterface], false)}]);
-	mapScope.init("github.com/funnelorg/funnel/run", [{prop: "parsed", name: "parsed", anonymous: false, exported: false, typ: parse.Map, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: Scope, tag: ""}, {prop: "Runner", name: "Runner", anonymous: true, exported: true, typ: ptrType$3, tag: ""}, {prop: "values", name: "values", anonymous: false, exported: false, typ: mapType, tag: ""}, {prop: "keys", name: "keys", anonymous: false, exported: false, typ: mapType$1, tag: ""}, {prop: "running", name: "running", anonymous: false, exported: false, typ: mapType$2, tag: ""}]);
-	scope.init("github.com/funnelorg/funnel/run", [{prop: "mm", name: "mm", anonymous: false, exported: false, typ: mapType, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: Scope, tag: ""}]);
+	mapScope.init("github.com/funnelorg/funnel/run", [{prop: "parsed", name: "parsed", anonymous: false, exported: false, typ: parse.Map, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: Scope, tag: ""}, {prop: "Runner", name: "Runner", anonymous: true, exported: true, typ: ptrType$3, tag: ""}, {prop: "values", name: "values", anonymous: false, exported: false, typ: mapType$1, tag: ""}, {prop: "keys", name: "keys", anonymous: false, exported: false, typ: mapType, tag: ""}, {prop: "running", name: "running", anonymous: false, exported: false, typ: mapType$2, tag: ""}]);
+	scope.init("github.com/funnelorg/funnel/run", [{prop: "mm", name: "mm", anonymous: false, exported: false, typ: mapType$1, tag: ""}, {prop: "base", name: "base", anonymous: false, exported: false, typ: Scope, tag: ""}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -6410,6 +6448,441 @@ $packages["github.com/funnelorg/funnel/math"] = (function() {
 	$pkg.$init = $init;
 	return $pkg;
 })();
+$packages["github.com/funnelorg/funnel/data"] = (function() {
+	var $pkg = {}, $init, builtin, parse, run, strconv, list, callResolved, callable, scopeWithKeys, mscope, mapType, sliceType, sliceType$1, mapType$1, sliceType$2, funcType, funcType$1, ptrType, ptrType$1, ptrType$2, funcType$2, Wrap, invoke;
+	builtin = $packages["github.com/funnelorg/funnel/builtin"];
+	parse = $packages["github.com/funnelorg/funnel/parse"];
+	run = $packages["github.com/funnelorg/funnel/run"];
+	strconv = $packages["strconv"];
+	list = $pkg.list = $newType(12, $kindSlice, "data.list", true, "github.com/funnelorg/funnel/data", false, null);
+	callResolved = $pkg.callResolved = $newType(8, $kindInterface, "data.callResolved", true, "github.com/funnelorg/funnel/data", false, null);
+	callable = $pkg.callable = $newType(8, $kindInterface, "data.callable", true, "github.com/funnelorg/funnel/data", false, null);
+	scopeWithKeys = $pkg.scopeWithKeys = $newType(8, $kindInterface, "data.scopeWithKeys", true, "github.com/funnelorg/funnel/data", false, null);
+	mscope = $pkg.mscope = $newType(0, $kindStruct, "data.mscope", true, "github.com/funnelorg/funnel/data", false, function(s_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.s = $ifaceNil;
+			return;
+		}
+		this.s = s_;
+	});
+	mapType = $mapType($emptyInterface, $emptyInterface);
+	sliceType = $sliceType(mapType);
+	sliceType$1 = $sliceType($emptyInterface);
+	mapType$1 = $mapType($String, $emptyInterface);
+	sliceType$2 = $sliceType(parse.Node);
+	funcType = $funcType([run.Scope, sliceType$2], [$emptyInterface], false);
+	funcType$1 = $funcType([sliceType$1], [$emptyInterface], false);
+	ptrType = $ptrType(parse.Token);
+	ptrType$1 = $ptrType(parse.Call);
+	ptrType$2 = $ptrType(parse.Map);
+	funcType$2 = $funcType([$emptyInterface], [$Bool], false);
+	Wrap = function(v) {
+		var _entry, _i, _key, _keys, _ref, _ref$1, key, mapped, mapped$1, result, v, v$1, v$2, v$3, v$4, v$5, v$6, value, x, x$1, x$2;
+		_ref = v;
+		if ($assertType(_ref, mscope, true)[1]) {
+			v$1 = $clone(_ref.$val, mscope);
+			return new v$1.constructor.elem(v$1);
+		} else if ($assertType(_ref, scopeWithKeys, true)[1]) {
+			v$2 = _ref;
+			return (x = new mscope.ptr(v$2), new x.constructor.elem(x));
+		} else if ($assertType(_ref, sliceType$1, true)[1]) {
+			v$3 = _ref.$val;
+			return ($subslice(new list(v$3.$array), v$3.$offset, v$3.$offset + v$3.$length));
+		} else if ($assertType(_ref, mapType, true)[1]) {
+			v$4 = _ref.$val;
+			mapped = run.NewScope(new sliceType([v$4]), $ifaceNil);
+			return (x$1 = new mscope.ptr($assertType(mapped, scopeWithKeys)), new x$1.constructor.elem(x$1));
+		} else if ($assertType(_ref, mapType$1, true)[1]) {
+			v$5 = _ref.$val;
+			result = $makeMap($emptyInterface.keyFor, []);
+			_ref$1 = v$5;
+			_i = 0;
+			_keys = $keys(_ref$1);
+			while (true) {
+				if (!(_i < _keys.length)) { break; }
+				_entry = _ref$1[_keys[_i]];
+				if (_entry === undefined) {
+					_i++;
+					continue;
+				}
+				key = _entry.k;
+				value = _entry.v;
+				_key = new $String(key); (result || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: value };
+				_i++;
+			}
+			mapped$1 = run.NewScope(new sliceType([result]), $ifaceNil);
+			return (x$2 = new mscope.ptr($assertType(mapped$1, scopeWithKeys)), new x$2.constructor.elem(x$2));
+		} else {
+			v$6 = _ref;
+			return v$6;
+		}
+	};
+	$pkg.Wrap = Wrap;
+	list.prototype.Get = function(key) {
+		var _1, _tuple, key, ok, s, t;
+		t = this;
+		_1 = key;
+		if ($interfaceIsEqual(_1, new $String(("item")))) {
+			return new run.ArgsResolver(($methodVal(t, "itemf")));
+		} else if ($interfaceIsEqual(_1, new $String(("filter")))) {
+			return new run.ArgsResolver(($methodVal(t, "filterf")));
+		} else if ($interfaceIsEqual(_1, new $String(("map")))) {
+			return new run.ArgsResolver(($methodVal(t, "mapf")));
+		} else if ($interfaceIsEqual(_1, new $String(("slice")))) {
+			return new run.ArgsResolver(($methodVal(t, "slicef")));
+		} else if ($interfaceIsEqual(_1, new $String(("count")))) {
+			return new funcType($methodVal(t, "countf"));
+		} else if ($interfaceIsEqual(_1, new $String(("splice")))) {
+			return new run.ArgsResolver(($methodVal(t, "splicef")));
+		}
+		_tuple = $assertType(key, $String, true);
+		s = _tuple[0];
+		ok = _tuple[1];
+		if (ok) {
+			return new run.ErrorStack.ptr("unknown field: " + s, "", 0, $ifaceNil);
+		}
+		return new run.ErrorStack.ptr("unknown field", "", 0, $ifaceNil);
+	};
+	$ptrType(list).prototype.Get = function(key) { return this.$get().Get(key); };
+	list.prototype.itemf = function(args) {
+		var _tuple, args, idx, n, ok, t;
+		t = this;
+		if (!((args.$length === 1))) {
+			return new run.ErrorStack.ptr("item: requires 1 arg", "", 0, $ifaceNil);
+		}
+		idx = 0;
+		_tuple = $assertType((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), builtin.Number, true);
+		n = $clone(_tuple[0], builtin.Number);
+		ok = _tuple[1];
+		if (ok) {
+			idx = ((n.F >> 0));
+		} else {
+			return new run.ErrorStack.ptr("item: not a number", "", 0, $ifaceNil);
+		}
+		if (idx < 0 || idx >= t.$length) {
+			return new run.ErrorStack.ptr("item: out of bounds", "", 0, $ifaceNil);
+		}
+		return Wrap(((idx < 0 || idx >= t.$length) ? ($throwRuntimeError("index out of range"), undefined) : t.$array[t.$offset + idx]));
+	};
+	$ptrType(list).prototype.itemf = function(args) { return this.$get().itemf(args); };
+	list.prototype.slicef = function(args) {
+		var _tmp, _tmp$1, _tuple, _tuple$1, args, end, n, n$1, ok, ok$1, start, t;
+		t = this;
+		_tmp = 0;
+		_tmp$1 = 0;
+		start = _tmp;
+		end = _tmp$1;
+		if (!((args.$length === 2))) {
+			return new run.ErrorStack.ptr("slice: requires 2 args", "", 0, $ifaceNil);
+		}
+		_tuple = $assertType((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), builtin.Number, true);
+		n = $clone(_tuple[0], builtin.Number);
+		ok = _tuple[1];
+		if (ok) {
+			start = ((n.F >> 0));
+		} else {
+			return new run.ErrorStack.ptr("slice: not a number", "", 0, $ifaceNil);
+		}
+		_tuple$1 = $assertType((1 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 1]), builtin.Number, true);
+		n$1 = $clone(_tuple$1[0], builtin.Number);
+		ok$1 = _tuple$1[1];
+		if (ok$1) {
+			end = ((n$1.F >> 0));
+		} else {
+			return new run.ErrorStack.ptr("slice: not a number", "", 0, $ifaceNil);
+		}
+		if (end > t.$length || start < 0 || end < start) {
+			return new run.ErrorStack.ptr("slice: out of bounds", "", 0, $ifaceNil);
+		}
+		return $subslice(t, start, end);
+	};
+	$ptrType(list).prototype.slicef = function(args) { return this.$get().slicef(args); };
+	list.prototype.countf = function(s, args) {
+		var args, s, t, x;
+		t = this;
+		return (x = new builtin.Number.ptr((t.$length)), new x.constructor.elem(x));
+	};
+	$ptrType(list).prototype.countf = function(s, args) { return this.$get().countf(s, args); };
+	list.prototype.splicef = function(args) {
+		var _tmp, _tmp$1, _tuple, _tuple$1, _tuple$2, args, end, n, n$1, ok, ok$1, ok$2, rep, start, t, x;
+		t = this;
+		_tmp = 0;
+		_tmp$1 = 0;
+		start = _tmp;
+		end = _tmp$1;
+		if (!((args.$length === 3))) {
+			return new run.ErrorStack.ptr("splice: requires 3 args", "", 0, $ifaceNil);
+		}
+		_tuple = $assertType((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), builtin.Number, true);
+		n = $clone(_tuple[0], builtin.Number);
+		ok = _tuple[1];
+		if (ok) {
+			start = ((n.F >> 0));
+		} else {
+			return new run.ErrorStack.ptr("splice: not a number", "", 0, $ifaceNil);
+		}
+		_tuple$1 = $assertType((1 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 1]), builtin.Number, true);
+		n$1 = $clone(_tuple$1[0], builtin.Number);
+		ok$1 = _tuple$1[1];
+		if (ok$1) {
+			end = ((n$1.F >> 0));
+		} else {
+			return new run.ErrorStack.ptr("splice: not a number", "", 0, $ifaceNil);
+		}
+		if (end > t.$length || start < 0 || start > end) {
+			return new run.ErrorStack.ptr("splice: out of bounds", "", 0, $ifaceNil);
+		}
+		_tuple$2 = $assertType((2 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 2]), list, true);
+		rep = _tuple$2[0];
+		ok$2 = _tuple$2[1];
+		if (ok$2) {
+			return $appendSlice($appendSlice($subslice(t, 0, start, start), $subslice(new sliceType$1(rep.$array), rep.$offset, rep.$offset + rep.$length)), (x = $subslice(t, end), $subslice(new sliceType$1(x.$array), x.$offset, x.$offset + x.$length)));
+		}
+		return new run.ErrorStack.ptr("splice: arg 3 must be a list", "", 0, $ifaceNil);
+	};
+	$ptrType(list).prototype.splicef = function(args) { return this.$get().splicef(args); };
+	list.prototype.filterf = function(args) {
+		var _i, _r, _ref, _ref$1, args, check, check$1, check$2, elt, kk, params, result, t, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _ref$1 = $f._ref$1; args = $f.args; check = $f.check; check$1 = $f.check$1; check$2 = $f.check$2; elt = $f.elt; kk = $f.kk; params = $f.params; result = $f.result; t = $f.t; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		t = this;
+		if (!((args.$length === 1))) {
+			$s = -1; return new run.ErrorStack.ptr("filter: requires condition function", "", 0, $ifaceNil);
+		}
+		result = (sliceType$1.nil);
+		_ref = t;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			kk = _i;
+			elt = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			params = new sliceType$1([(x = new builtin.Number.ptr((kk)), new x.constructor.elem(x)), Wrap(elt)]);
+			_r = invoke("filter", (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), params); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_ref$1 = _r;
+			/* */ if ($assertType(_ref$1, $Bool, true)[1]) { $s = 4; continue; }
+			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ($assertType(_ref$1, $Bool, true)[1]) { */ case 4:
+				check = _ref$1.$val;
+				if (check) {
+					result = $append(result, elt);
+				}
+				$s = 7; continue;
+			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 5:
+				check$1 = _ref$1;
+				$s = -1; return check$1;
+			/* } else { */ case 6:
+				check$2 = _ref$1;
+				$s = -1; return new run.ErrorStack.ptr("filter: function returned non boolean", "", 0, $ifaceNil);
+			/* } */ case 7:
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return ($subslice(new list(result.$array), result.$offset, result.$offset + result.$length));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: list.prototype.filterf }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.args = args; $f.check = check; $f.check$1 = check$1; $f.check$2 = check$2; $f.elt = elt; $f.kk = kk; $f.params = params; $f.result = result; $f.t = t; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$ptrType(list).prototype.filterf = function(args) { return this.$get().filterf(args); };
+	list.prototype.mapf = function(args) {
+		var _i, _r, _ref, args, elt, kk, params, result, t, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; args = $f.args; elt = $f.elt; kk = $f.kk; params = $f.params; result = $f.result; t = $f.t; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		t = this;
+		if (!((args.$length === 1))) {
+			$s = -1; return new run.ErrorStack.ptr("map: requires one arg", "", 0, $ifaceNil);
+		}
+		result = (sliceType$1.nil);
+		_ref = t;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			kk = _i;
+			elt = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			params = new sliceType$1([(x = new builtin.Number.ptr((kk)), new x.constructor.elem(x)), Wrap(elt)]);
+			_r = invoke("map", (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), params); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			result = $append(result, _r);
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return ($subslice(new list(result.$array), result.$offset, result.$offset + result.$length));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: list.prototype.mapf }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f.args = args; $f.elt = elt; $f.kk = kk; $f.params = params; $f.result = result; $f.t = t; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$ptrType(list).prototype.mapf = function(args) { return this.$get().mapf(args); };
+	invoke = function(kind, fn, args) {
+		var _i, _key, _r, _r$1, _r$2, _ref, _ref$1, arg, args, f, fn, fn$1, fn$2, fn$3, fn$4, fn$5, key, kind, kk, m, nodes, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _key = $f._key; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _ref$1 = $f._ref$1; arg = $f.arg; args = $f.args; f = $f.f; fn = $f.fn; fn$1 = $f.fn$1; fn$2 = $f.fn$2; fn$3 = $f.fn$3; fn$4 = $f.fn$4; fn$5 = $f.fn$5; key = $f.key; kind = $f.kind; kk = $f.kk; m = $f.m; nodes = $f.nodes; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		f = $throwNilPointerError;
+		_ref = fn;
+		/* */ if ($assertType(_ref, funcType$1, true)[1]) { $s = 1; continue; }
+		/* */ if ($assertType(_ref, callResolved, true)[1]) { $s = 2; continue; }
+		/* */ if ($assertType(_ref, funcType, true)[1]) { $s = 3; continue; }
+		/* */ if ($assertType(_ref, callable, true)[1]) { $s = 4; continue; }
+		/* */ $s = 5; continue;
+		/* if ($assertType(_ref, funcType$1, true)[1]) { */ case 1:
+			fn$1 = _ref.$val;
+			_r = fn$1(args); /* */ $s = 7; case 7: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			$s = -1; return _r;
+		/* } else if ($assertType(_ref, callResolved, true)[1]) { */ case 2:
+			fn$2 = _ref;
+			_r$1 = fn$2.CallResolved(args); /* */ $s = 8; case 8: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			$s = -1; return _r$1;
+		/* } else if ($assertType(_ref, funcType, true)[1]) { */ case 3:
+			fn$3 = _ref.$val;
+			f = fn$3;
+			$s = 6; continue;
+		/* } else if ($assertType(_ref, callable, true)[1]) { */ case 4:
+			fn$4 = _ref;
+			f = $methodVal(fn$4, "Call");
+			$s = 6; continue;
+		/* } else { */ case 5:
+			fn$5 = _ref;
+			$s = -1; return new run.ErrorStack.ptr(kind + ": arg is not a function", "", 0, $ifaceNil);
+		/* } */ case 6:
+		m = new sliceType([$makeMap($emptyInterface.keyFor, [])]);
+		nodes = $makeSlice(sliceType$2, args.$length);
+		_ref$1 = args;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref$1.$length)) { break; }
+			kk = _i;
+			arg = ((_i < 0 || _i >= _ref$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref$1.$array[_ref$1.$offset + _i]);
+			key = "arg: " + strconv.Itoa(kk);
+			_key = new $String(key); ((0 >= m.$length ? ($throwRuntimeError("index out of range"), undefined) : m.$array[m.$offset + 0]) || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: arg };
+			parse.Node.copy(((kk < 0 || kk >= nodes.$length) ? ($throwRuntimeError("index out of range"), undefined) : nodes.$array[nodes.$offset + kk]), new parse.Node.ptr(new parse.Token.ptr(new parse.Loc.ptr("", 0), key), ptrType$1.nil, ptrType$2.nil));
+			_i++;
+		}
+		_r$2 = f(run.NewScope(m, $ifaceNil), nodes); /* */ $s = 9; case 9: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+		$s = -1; return _r$2;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: invoke }; } $f._i = _i; $f._key = _key; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.f = f; $f.fn = fn; $f.fn$1 = fn$1; $f.fn$2 = fn$2; $f.fn$3 = fn$3; $f.fn$4 = fn$4; $f.fn$5 = fn$5; $f.key = key; $f.kind = kind; $f.kk = kk; $f.m = m; $f.nodes = nodes; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mscope.ptr.prototype.Get = function(key) {
+		var _1, _r, key, m, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; key = $f.key; m = $f.m; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		m = this;
+		_1 = key;
+		if ($interfaceIsEqual(_1, new $String(("filter")))) {
+			$s = -1; return new run.ArgsResolver(($methodVal($clone(m, mscope), "filterf")));
+		} else if ($interfaceIsEqual(_1, new $String(("map")))) {
+			$s = -1; return new run.ArgsResolver(($methodVal($clone(m, mscope), "mapf")));
+		} else if ($interfaceIsEqual(_1, new $String(("count")))) {
+			$s = -1; return new funcType($methodVal($clone(m, mscope), "countf"));
+		}
+		_r = m.s.Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: mscope.ptr.prototype.Get }; } $f._1 = _1; $f._r = _r; $f.key = key; $f.m = m; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mscope.prototype.Get = function(key) { return this.$val.Get(key); };
+	mscope.ptr.prototype.ForEachKeys = function(fn) {
+		var fn, m, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; fn = $f.fn; m = $f.m; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		m = this;
+		$r = m.s.ForEachKeys(fn); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: mscope.ptr.prototype.ForEachKeys }; } $f.fn = fn; $f.m = m; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mscope.prototype.ForEachKeys = function(fn) { return this.$val.ForEachKeys(fn); };
+	mscope.ptr.prototype.countf = function(s, args) {
+		var args, count, m, s, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; args = $f.args; count = $f.count; m = $f.m; s = $f.s; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		count = [count];
+		m = this;
+		count[0] = 0;
+		$r = m.s.ForEachKeys((function(count) { return function(k) {
+			var k;
+			count[0] = count[0] + (1) >> 0;
+			return false;
+		}; })(count)); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return (x = new builtin.Number.ptr((count[0])), new x.constructor.elem(x));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: mscope.ptr.prototype.countf }; } $f.args = args; $f.count = count; $f.m = m; $f.s = s; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mscope.prototype.countf = function(s, args) { return this.$val.countf(s, args); };
+	mscope.ptr.prototype.filterf = function(args) {
+		var args, err, m, result, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; args = $f.args; err = $f.err; m = $f.m; result = $f.result; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		args = [args];
+		err = [err];
+		m = [m];
+		result = [result];
+		m[0] = this;
+		if (!((args[0].$length === 1))) {
+			$s = -1; return new run.ErrorStack.ptr("filter: requires condition function", "", 0, $ifaceNil);
+		}
+		result[0] = $makeMap($emptyInterface.keyFor, []);
+		err[0] = $ifaceNil;
+		$r = m[0].s.ForEachKeys((function(args, err, m, result) { return function $b(key) {
+			var _key, _r, _r$1, _ref, check, check$1, key, params, v, $s, $r;
+			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _key = $f._key; _r = $f._r; _r$1 = $f._r$1; _ref = $f._ref; check = $f.check; check$1 = $f.check$1; key = $f.key; params = $f.params; v = $f.v; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_r = m[0].s.Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			v = _r;
+			params = new sliceType$1([key, Wrap(v)]);
+			_r$1 = invoke("filter", (0 >= args[0].$length ? ($throwRuntimeError("index out of range"), undefined) : args[0].$array[args[0].$offset + 0]), params); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			_ref = _r$1;
+			/* */ if ($assertType(_ref, $Bool, true)[1]) { $s = 3; continue; }
+			/* */ if ($assertType(_ref, $error, true)[1]) { $s = 4; continue; }
+			/* */ $s = 5; continue;
+			/* if ($assertType(_ref, $Bool, true)[1]) { */ case 3:
+				check = _ref.$val;
+				if (check) {
+					_key = key; (result[0] || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: v };
+				}
+				$s = -1; return false;
+			/* } else if ($assertType(_ref, $error, true)[1]) { */ case 4:
+				check$1 = _ref;
+				err[0] = check$1;
+				$s = -1; return true;
+			/* } */ case 5:
+			err[0] = new run.ErrorStack.ptr("filter: function returned non-boolean", "", 0, $ifaceNil);
+			$s = -1; return true;
+			/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f._key = _key; $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f.check = check; $f.check$1 = check$1; $f.key = key; $f.params = params; $f.v = v; $f.$s = $s; $f.$r = $r; return $f;
+		}; })(args, err, m, result)); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		if (!($interfaceIsEqual(err[0], $ifaceNil))) {
+			$s = -1; return err[0];
+		}
+		$s = -1; return Wrap(new mapType(result[0]));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: mscope.ptr.prototype.filterf }; } $f.args = args; $f.err = err; $f.m = m; $f.result = result; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mscope.prototype.filterf = function(args) { return this.$val.filterf(args); };
+	mscope.ptr.prototype.mapf = function(args) {
+		var args, m, result, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; args = $f.args; m = $f.m; result = $f.result; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		args = [args];
+		m = [m];
+		result = [result];
+		m[0] = this;
+		if (!((args[0].$length === 1))) {
+			$s = -1; return new run.ErrorStack.ptr("map: requires 1 arg", "", 0, $ifaceNil);
+		}
+		result[0] = $makeMap($emptyInterface.keyFor, []);
+		$r = m[0].s.ForEachKeys((function(args, m, result) { return function $b(key) {
+			var _key, _r, _r$1, _r$2, key, params, $s, $r;
+			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _key = $f._key; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; key = $f.key; params = $f.params; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_r = m[0].s.Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_r$1 = Wrap(_r); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			params = new sliceType$1([key, _r$1]);
+			_r$2 = invoke("map", (0 >= args[0].$length ? ($throwRuntimeError("index out of range"), undefined) : args[0].$array[args[0].$offset + 0]), params); /* */ $s = 3; case 3: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+			_key = key; (result[0] || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: _r$2 };
+			$s = -1; return false;
+			/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f._key = _key; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f.key = key; $f.params = params; $f.$s = $s; $f.$r = $r; return $f;
+		}; })(args, m, result)); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return Wrap(new mapType(result[0]));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: mscope.ptr.prototype.mapf }; } $f.args = args; $f.m = m; $f.result = result; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mscope.prototype.mapf = function(args) { return this.$val.mapf(args); };
+	list.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "itemf", name: "itemf", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([sliceType$1], [$emptyInterface], false)}, {prop: "slicef", name: "slicef", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([sliceType$1], [$emptyInterface], false)}, {prop: "countf", name: "countf", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([run.Scope, sliceType$2], [$emptyInterface], false)}, {prop: "splicef", name: "splicef", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([sliceType$1], [$emptyInterface], false)}, {prop: "filterf", name: "filterf", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([sliceType$1], [$emptyInterface], false)}, {prop: "mapf", name: "mapf", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([sliceType$1], [$emptyInterface], false)}];
+	mscope.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}, {prop: "ForEachKeys", name: "ForEachKeys", pkg: "", typ: $funcType([funcType$2], [], false)}, {prop: "countf", name: "countf", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([run.Scope, sliceType$2], [$emptyInterface], false)}, {prop: "filterf", name: "filterf", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([sliceType$1], [$emptyInterface], false)}, {prop: "mapf", name: "mapf", pkg: "github.com/funnelorg/funnel/data", typ: $funcType([sliceType$1], [$emptyInterface], false)}];
+	list.init($emptyInterface);
+	callResolved.init([{prop: "CallResolved", name: "CallResolved", pkg: "", typ: $funcType([sliceType$1], [$emptyInterface], false)}]);
+	callable.init([{prop: "Call", name: "Call", pkg: "", typ: $funcType([run.Scope, sliceType$2], [$emptyInterface], false)}]);
+	scopeWithKeys.init([{prop: "ForEachKeys", name: "ForEachKeys", pkg: "", typ: $funcType([funcType$2], [], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}]);
+	mscope.init("github.com/funnelorg/funnel/data", [{prop: "s", name: "s", anonymous: false, exported: false, typ: scopeWithKeys, tag: ""}]);
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = builtin.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strconv.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
 $packages["honnef.co/go/js/util"] = (function() {
 	var $pkg = {}, $init, js, EventTarget, ptrType, funcType;
 	js = $packages["github.com/gopherjs/gopherjs/js"];
@@ -6617,7 +7090,8 @@ $packages["honnef.co/go/js/xhr"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/url"] = (function() {
-	var $pkg = {}, $init, parse, run, xhr, URL, mapType, sliceType, sliceType$1, funcType, Scope, urlf;
+	var $pkg = {}, $init, data, parse, run, xhr, URL, mapType, sliceType, sliceType$1, funcType, Scope, urlf;
+	data = $packages["github.com/funnelorg/funnel/data"];
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	run = $packages["github.com/funnelorg/funnel/run"];
 	xhr = $packages["honnef.co/go/js/xhr"];
@@ -6638,7 +7112,7 @@ $packages["github.com/funnelorg/funnel/url"] = (function() {
 		if (!($interfaceIsEqual(err, $ifaceNil))) {
 			$s = -1; return err;
 		}
-		$s = -1; return $internalize(req.Object.response, $emptyInterface);
+		$s = -1; return data.Wrap($internalize(req.Object.response, $emptyInterface));
 		/* */ } return; } if ($f === undefined) { $f = { $blk: URL.prototype.json }; } $f._r = _r; $f.args = args; $f.err = err; $f.req = req; $f.s = s; $f.u = u; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$ptrType(URL).prototype.json = function(s, args) { return new URL(this.$get()).json(s, args); };
@@ -6678,9 +7152,10 @@ $packages["github.com/funnelorg/funnel/url"] = (function() {
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		$r = parse.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = run.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = xhr.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = data.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = xhr.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("url"), v: new run.ArgsResolver((urlf)) }]);
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
@@ -6688,53 +7163,72 @@ $packages["github.com/funnelorg/funnel/url"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/playground"] = (function() {
-	var $pkg = {}, $init, funnel, builtin, math, url, js, stackable, mapType, funcType, funcType$1, Eval, main;
+	var $pkg = {}, $init, funnel, builtin, math, url, js, stackable, scopeWithKeys, mapType, funcType, funcType$1, mapType$1, funcType$2, Eval, format, main;
 	funnel = $packages["github.com/funnelorg/funnel"];
 	builtin = $packages["github.com/funnelorg/funnel/builtin"];
 	math = $packages["github.com/funnelorg/funnel/math"];
 	url = $packages["github.com/funnelorg/funnel/url"];
 	js = $packages["github.com/gopherjs/gopherjs/js"];
 	stackable = $pkg.stackable = $newType(8, $kindInterface, "main.stackable", true, "github.com/funnelorg/playground", false, null);
-	mapType = $mapType($String, $emptyInterface);
+	scopeWithKeys = $pkg.scopeWithKeys = $newType(8, $kindInterface, "main.scopeWithKeys", true, "github.com/funnelorg/playground", false, null);
+	mapType = $mapType($emptyInterface, $emptyInterface);
 	funcType = $funcType([$emptyInterface], [], false);
 	funcType$1 = $funcType([$String, funcType], [], false);
+	mapType$1 = $mapType($String, $emptyInterface);
+	funcType$2 = $funcType([$emptyInterface], [$Bool], false);
 	Eval = function(code, done) {
 		var code, done;
 		$go((function $b() {
-			var _r, _r$1, _r$2, _tuple, _tuple$1, err, ok, ok$1, result, s, $s, $r;
-			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; err = $f.err; ok = $f.ok; ok$1 = $f.ok$1; result = $f.result; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			var _r, _r$1, $s, $r;
+			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 			_r = funnel.Eval(url.Scope(math.Scope(builtin.Scope)), "browser", code); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
-			result = _r;
-			_tuple = $assertType(result, stackable, true);
-			s = _tuple[0];
-			ok = _tuple[1];
-			/* */ if (ok) { $s = 2; continue; }
-			/* */ $s = 3; continue;
-			/* if (ok) { */ case 2:
-				_r$1 = s.Stack(); /* */ $s = 5; case 5: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
-				result = new $String(_r$1);
-				$s = 4; continue;
-			/* } else { */ case 3:
-				_tuple$1 = $assertType(result, $error, true);
-				err = _tuple$1[0];
-				ok$1 = _tuple$1[1];
-				/* */ if (ok$1) { $s = 6; continue; }
-				/* */ $s = 7; continue;
-				/* if (ok$1) { */ case 6:
-					_r$2 = err.Error(); /* */ $s = 8; case 8: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
-					result = new mapType($makeMap($String.keyFor, [{ k: "Error", v: new $String(_r$2) }]));
-				/* } */ case 7:
-			/* } */ case 4:
-			$r = done(result); /* */ $s = 9; case 9: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			_r$1 = format(_r); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			$r = done(_r$1); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 			$s = -1; return;
-			/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f.err = err; $f.ok = ok; $f.ok$1 = ok$1; $f.result = result; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+			/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f._r = _r; $f._r$1 = _r$1; $f.$s = $s; $f.$r = $r; return $f;
 		}), []);
 	};
 	$pkg.Eval = Eval;
+	format = function(v) {
+		var _r, _r$1, _ref, result, v, v$1, v$2, v$3, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _ref = $f._ref; result = $f.result; v = $f.v; v$1 = $f.v$1; v$2 = $f.v$2; v$3 = $f.v$3; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		result = [result];
+		v$1 = [v$1];
+		_ref = v;
+		/* */ if ($assertType(_ref, stackable, true)[1]) { $s = 1; continue; }
+		/* */ if ($assertType(_ref, $error, true)[1]) { $s = 2; continue; }
+		/* */ if ($assertType(_ref, scopeWithKeys, true)[1]) { $s = 3; continue; }
+		/* */ $s = 4; continue;
+		/* if ($assertType(_ref, stackable, true)[1]) { */ case 1:
+			v$2 = _ref;
+			_r = v$2.Stack(); /* */ $s = 5; case 5: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			$s = -1; return new $String(_r);
+		/* } else if ($assertType(_ref, $error, true)[1]) { */ case 2:
+			v$3 = _ref;
+			_r$1 = v$3.Error(); /* */ $s = 6; case 6: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			$s = -1; return new $String(_r$1);
+		/* } else if ($assertType(_ref, scopeWithKeys, true)[1]) { */ case 3:
+			v$1[0] = _ref;
+			result[0] = $makeMap($emptyInterface.keyFor, []);
+			$r = v$1[0].ForEachKeys((function(result, v$1) { return function $b(key) {
+				var _key, _r$2, _r$3, key, $s, $r;
+				/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _key = $f._key; _r$2 = $f._r$2; _r$3 = $f._r$3; key = $f.key; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+				_r$2 = v$1[0].Get(key); /* */ $s = 1; case 1: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+				_r$3 = format(_r$2); /* */ $s = 2; case 2: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+				_key = key; (result[0] || $throwRuntimeError("assignment to entry in nil map"))[$emptyInterface.keyFor(_key)] = { k: _key, v: _r$3 };
+				$s = -1; return false;
+				/* */ } return; } if ($f === undefined) { $f = { $blk: $b }; } $f._key = _key; $f._r$2 = _r$2; $f._r$3 = _r$3; $f.key = key; $f.$s = $s; $f.$r = $r; return $f;
+			}; })(result, v$1)); /* */ $s = 7; case 7: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			$s = -1; return new mapType(result[0]);
+		/* } */ case 4:
+		$s = -1; return v;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: format }; } $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f.result = result; $f.v = v; $f.v$1 = v$1; $f.v$2 = v$2; $f.v$3 = v$3; $f.$s = $s; $f.$r = $r; return $f;
+	};
 	main = function() {
-		$global.Funnel = $externalize($makeMap($String.keyFor, [{ k: "Eval", v: new funcType$1(Eval) }]), mapType);
+		$global.Funnel = $externalize($makeMap($String.keyFor, [{ k: "Eval", v: new funcType$1(Eval) }]), mapType$1);
 	};
 	stackable.init([{prop: "Stack", name: "Stack", pkg: "", typ: $funcType([], [$String], false)}]);
+	scopeWithKeys.init([{prop: "ForEachKeys", name: "ForEachKeys", pkg: "", typ: $funcType([funcType$2], [], false)}, {prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
