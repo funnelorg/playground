@@ -6394,62 +6394,8 @@ $packages["github.com/funnelorg/funnel"] = (function() {
 	$pkg.$init = $init;
 	return $pkg;
 })();
-$packages["github.com/funnelorg/funnel/math"] = (function() {
-	var $pkg = {}, $init, builtin, run, math, mapType, sliceType, Scope, square, root;
-	builtin = $packages["github.com/funnelorg/funnel/builtin"];
-	run = $packages["github.com/funnelorg/funnel/run"];
-	math = $packages["math"];
-	mapType = $mapType($emptyInterface, $emptyInterface);
-	sliceType = $sliceType(mapType);
-	Scope = function(base) {
-		var base;
-		return run.NewScope(new sliceType([$pkg.Map]), base);
-	};
-	$pkg.Scope = Scope;
-	square = function(args) {
-		var _ref, args, f, f$1, x;
-		if (!((args.$length === 1))) {
-			return new run.ErrorStack.ptr("math:square: must have exactly 1 arg", "", 0, $ifaceNil);
-		}
-		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
-		if ($assertType(_ref, builtin.Number, true)[1]) {
-			f = $clone(_ref.$val, builtin.Number);
-			return (x = new builtin.Number.ptr(f.F * f.F), new x.constructor.elem(x));
-		} else if ($assertType(_ref, $error, true)[1]) {
-			f$1 = _ref;
-			return f$1;
-		}
-		return new run.ErrorStack.ptr("math:square: not a number", "", 0, $ifaceNil);
-	};
-	root = function(args) {
-		var _ref, args, f, f$1, x;
-		if (!((args.$length === 1))) {
-			return new run.ErrorStack.ptr("math:root: must have exactly 1 arg", "", 0, $ifaceNil);
-		}
-		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
-		if ($assertType(_ref, builtin.Number, true)[1]) {
-			f = $clone(_ref.$val, builtin.Number);
-			return (x = new builtin.Number.ptr(math.Sqrt(f.F)), new x.constructor.elem(x));
-		} else if ($assertType(_ref, $error, true)[1]) {
-			f$1 = _ref;
-			return f$1;
-		}
-		return new run.ErrorStack.ptr("math:root: not a number", "", 0, $ifaceNil);
-	};
-	$init = function() {
-		$pkg.$init = function() {};
-		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-		$r = builtin.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = run.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = math.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("math:square"), v: new run.ArgsResolver((square)) }, { k: new $String("math:root"), v: new run.ArgsResolver((root)) }]);
-		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
-	};
-	$pkg.$init = $init;
-	return $pkg;
-})();
 $packages["github.com/funnelorg/funnel/data"] = (function() {
-	var $pkg = {}, $init, builtin, parse, run, strconv, list, callResolved, callable, scopeWithKeys, mscope, mapType, sliceType, sliceType$1, mapType$1, sliceType$2, funcType, funcType$1, ptrType, ptrType$1, ptrType$2, funcType$2, Wrap, invoke;
+	var $pkg = {}, $init, builtin, parse, run, strconv, list, callResolved, callable, scopeWithKeys, mscope, mapType, sliceType, sliceType$1, mapType$1, sliceType$2, funcType, funcType$1, ptrType, ptrType$1, ptrType$2, funcType$2, Scope, Wrap, listf, invoke, mapf;
 	builtin = $packages["github.com/funnelorg/funnel/builtin"];
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	run = $packages["github.com/funnelorg/funnel/run"];
@@ -6477,6 +6423,11 @@ $packages["github.com/funnelorg/funnel/data"] = (function() {
 	ptrType$1 = $ptrType(parse.Call);
 	ptrType$2 = $ptrType(parse.Map);
 	funcType$2 = $funcType([$emptyInterface], [$Bool], false);
+	Scope = function(base) {
+		var base;
+		return run.NewScope(new sliceType([$pkg.Map]), base);
+	};
+	$pkg.Scope = Scope;
 	Wrap = function(v) {
 		var _entry, _i, _key, _keys, _ref, _ref$1, key, mapped, mapped$1, result, v, v$1, v$2, v$3, v$4, v$5, v$6, value, x, x$1, x$2;
 		_ref = v;
@@ -6519,6 +6470,10 @@ $packages["github.com/funnelorg/funnel/data"] = (function() {
 		}
 	};
 	$pkg.Wrap = Wrap;
+	listf = function(args) {
+		var args;
+		return ($subslice(new list(args.$array), args.$offset, args.$offset + args.$length));
+	};
 	list.prototype.Get = function(key) {
 		var _1, _tuple, key, ok, s, t;
 		t = this;
@@ -6751,6 +6706,19 @@ $packages["github.com/funnelorg/funnel/data"] = (function() {
 		$s = -1; return _r$2;
 		/* */ } return; } if ($f === undefined) { $f = { $blk: invoke }; } $f._i = _i; $f._key = _key; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.f = f; $f.fn = fn; $f.fn$1 = fn$1; $f.fn$2 = fn$2; $f.fn$3 = fn$3; $f.fn$4 = fn$4; $f.fn$5 = fn$5; $f.key = key; $f.kind = kind; $f.kk = kk; $f.m = m; $f.nodes = nodes; $f.$s = $s; $f.$r = $r; return $f;
 	};
+	mapf = function(args) {
+		var _tuple, args, ok, s, x;
+		if (!((args.$length === 1))) {
+			return new run.ErrorStack.ptr("map: needs 1 arg", "", 0, $ifaceNil);
+		}
+		_tuple = $assertType((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), scopeWithKeys, true);
+		s = _tuple[0];
+		ok = _tuple[1];
+		if (!ok) {
+			return new run.ErrorStack.ptr("map: not a map", "", 0, $ifaceNil);
+		}
+		return (x = new mscope.ptr(s), new x.constructor.elem(x));
+	};
 	mscope.ptr.prototype.Get = function(key) {
 		var _1, _r, key, m, $s, $r;
 		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; key = $f.key; m = $f.m; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -6878,6 +6846,61 @@ $packages["github.com/funnelorg/funnel/data"] = (function() {
 		$r = parse.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = strconv.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("data:list"), v: new run.ArgsResolver((listf)) }, { k: new $String("data:map"), v: new run.ArgsResolver((mapf)) }]);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["github.com/funnelorg/funnel/math"] = (function() {
+	var $pkg = {}, $init, builtin, run, math, mapType, sliceType, Scope, square, root;
+	builtin = $packages["github.com/funnelorg/funnel/builtin"];
+	run = $packages["github.com/funnelorg/funnel/run"];
+	math = $packages["math"];
+	mapType = $mapType($emptyInterface, $emptyInterface);
+	sliceType = $sliceType(mapType);
+	Scope = function(base) {
+		var base;
+		return run.NewScope(new sliceType([$pkg.Map]), base);
+	};
+	$pkg.Scope = Scope;
+	square = function(args) {
+		var _ref, args, f, f$1, x;
+		if (!((args.$length === 1))) {
+			return new run.ErrorStack.ptr("math:square: must have exactly 1 arg", "", 0, $ifaceNil);
+		}
+		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
+		if ($assertType(_ref, builtin.Number, true)[1]) {
+			f = $clone(_ref.$val, builtin.Number);
+			return (x = new builtin.Number.ptr(f.F * f.F), new x.constructor.elem(x));
+		} else if ($assertType(_ref, $error, true)[1]) {
+			f$1 = _ref;
+			return f$1;
+		}
+		return new run.ErrorStack.ptr("math:square: not a number", "", 0, $ifaceNil);
+	};
+	root = function(args) {
+		var _ref, args, f, f$1, x;
+		if (!((args.$length === 1))) {
+			return new run.ErrorStack.ptr("math:root: must have exactly 1 arg", "", 0, $ifaceNil);
+		}
+		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
+		if ($assertType(_ref, builtin.Number, true)[1]) {
+			f = $clone(_ref.$val, builtin.Number);
+			return (x = new builtin.Number.ptr(math.Sqrt(f.F)), new x.constructor.elem(x));
+		} else if ($assertType(_ref, $error, true)[1]) {
+			f$1 = _ref;
+			return f$1;
+		}
+		return new run.ErrorStack.ptr("math:root: not a number", "", 0, $ifaceNil);
+	};
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = builtin.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = math.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("math:square"), v: new run.ArgsResolver((square)) }, { k: new $String("math:root"), v: new run.ArgsResolver((root)) }]);
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.$init = $init;
@@ -7163,9 +7186,10 @@ $packages["github.com/funnelorg/funnel/url"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/playground"] = (function() {
-	var $pkg = {}, $init, funnel, builtin, math, url, js, stackable, scopeWithKeys, mapType, funcType, funcType$1, mapType$1, funcType$2, Eval, format, main;
+	var $pkg = {}, $init, funnel, builtin, data, math, url, js, stackable, scopeWithKeys, mapType, funcType, funcType$1, mapType$1, funcType$2, s, Eval, format, main;
 	funnel = $packages["github.com/funnelorg/funnel"];
 	builtin = $packages["github.com/funnelorg/funnel/builtin"];
+	data = $packages["github.com/funnelorg/funnel/data"];
 	math = $packages["github.com/funnelorg/funnel/math"];
 	url = $packages["github.com/funnelorg/funnel/url"];
 	js = $packages["github.com/gopherjs/gopherjs/js"];
@@ -7181,7 +7205,7 @@ $packages["github.com/funnelorg/playground"] = (function() {
 		$go((function $b() {
 			var _r, _r$1, $s, $r;
 			/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
-			_r = funnel.Eval(url.Scope(math.Scope(builtin.Scope)), "browser", code); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_r = funnel.Eval(s, "browser", code); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 			_r$1 = format(_r); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
 			$r = done(_r$1); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 			$s = -1; return;
@@ -7234,9 +7258,11 @@ $packages["github.com/funnelorg/playground"] = (function() {
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		$r = funnel.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = builtin.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = math.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = url.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = js.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = data.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = math.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = url.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = js.$init(); /* */ $s = 6; case 6: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		s = data.Scope(url.Scope(math.Scope(builtin.Scope)));
 		if ($pkg === $mainPkg) {
 			main();
 			$mainFinished = true;
