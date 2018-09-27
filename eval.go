@@ -10,11 +10,12 @@ import (
 	"github.com/funnelorg/funnel/builtin"
 	"github.com/funnelorg/funnel/data"
 	"github.com/funnelorg/funnel/math"
+	"github.com/funnelorg/funnel/code"	
 	"github.com/funnelorg/funnel/url"
 	"github.com/gopherjs/gopherjs/js"
 )
 
-var s = data.Scope(url.Scope(math.Scope(builtin.Scope)))
+var s = code.Scope(data.Scope(url.Scope(math.Scope(builtin.Scope))))
 
 func Eval(code string, done func(interface{})) {
 	go func() {
