@@ -2458,7 +2458,7 @@ $packages["math"] = (function() {
 	return $pkg;
 })();
 $packages["unicode/utf8"] = (function() {
-	var $pkg = {}, $init, acceptRange, first, acceptRanges, DecodeRune, DecodeRuneInString, RuneLen, EncodeRune, RuneCount, RuneCountInString, ValidRune;
+	var $pkg = {}, $init, acceptRange, first, acceptRanges, DecodeRune, DecodeRuneInString, DecodeLastRuneInString, RuneLen, EncodeRune, RuneCount, RuneCountInString, RuneStart, ValidRune;
 	acceptRange = $pkg.acceptRange = $newType(0, $kindStruct, "utf8.acceptRange", true, "unicode/utf8", false, function(lo_, hi_) {
 		this.$val = this;
 		if (arguments.length === 0) {
@@ -2621,6 +2621,59 @@ $packages["unicode/utf8"] = (function() {
 		return [r, size];
 	};
 	$pkg.DecodeRuneInString = DecodeRuneInString;
+	DecodeLastRuneInString = function(s) {
+		var _tmp, _tmp$1, _tmp$2, _tmp$3, _tmp$4, _tmp$5, _tmp$6, _tmp$7, _tuple, end, lim, r, s, size, start;
+		r = 0;
+		size = 0;
+		end = s.length;
+		if (end === 0) {
+			_tmp = 65533;
+			_tmp$1 = 0;
+			r = _tmp;
+			size = _tmp$1;
+			return [r, size];
+		}
+		start = end - 1 >> 0;
+		r = ((s.charCodeAt(start) >> 0));
+		if (r < 128) {
+			_tmp$2 = r;
+			_tmp$3 = 1;
+			r = _tmp$2;
+			size = _tmp$3;
+			return [r, size];
+		}
+		lim = end - 4 >> 0;
+		if (lim < 0) {
+			lim = 0;
+		}
+		start = start - (1) >> 0;
+		while (true) {
+			if (!(start >= lim)) { break; }
+			if (RuneStart(s.charCodeAt(start))) {
+				break;
+			}
+			start = start - (1) >> 0;
+		}
+		if (start < 0) {
+			start = 0;
+		}
+		_tuple = DecodeRuneInString($substring(s, start, end));
+		r = _tuple[0];
+		size = _tuple[1];
+		if (!(((start + size >> 0) === end))) {
+			_tmp$4 = 65533;
+			_tmp$5 = 1;
+			r = _tmp$4;
+			size = _tmp$5;
+			return [r, size];
+		}
+		_tmp$6 = r;
+		_tmp$7 = size;
+		r = _tmp$6;
+		size = _tmp$7;
+		return [r, size];
+	};
+	$pkg.DecodeLastRuneInString = DecodeLastRuneInString;
 	RuneLen = function(r) {
 		var r;
 		if (r < 0) {
@@ -2767,6 +2820,11 @@ $packages["unicode/utf8"] = (function() {
 		return n;
 	};
 	$pkg.RuneCountInString = RuneCountInString;
+	RuneStart = function(b) {
+		var b;
+		return !((((b & 192) >>> 0) === 128));
+	};
+	$pkg.RuneStart = RuneStart;
 	ValidRune = function(r) {
 		var r;
 		if (0 <= r && r < 55296) {
@@ -5195,7 +5253,7 @@ $packages["strconv"] = (function() {
 	return $pkg;
 })();
 $packages["unicode"] = (function() {
-	var $pkg = {}, $init, RangeTable, Range16, Range32, CaseRange, d, arrayType, sliceType, sliceType$1, sliceType$3, _Nd, _White_Space, _CaseRanges, to, IsDigit, IsSpace, is16, is32, isExcludingLatin, To, ToLower;
+	var $pkg = {}, $init, RangeTable, Range16, Range32, CaseRange, d, foldPair, arrayType, sliceType, sliceType$1, sliceType$3, sliceType$4, _Nd, _White_Space, _CaseRanges, asciiFold, caseOrbit, to, IsDigit, IsSpace, is16, is32, isExcludingLatin, To, ToUpper, ToLower, SimpleFold;
 	RangeTable = $pkg.RangeTable = $newType(0, $kindStruct, "unicode.RangeTable", true, "unicode", true, function(R16_, R32_, LatinOffset_) {
 		this.$val = this;
 		if (arguments.length === 0) {
@@ -5245,10 +5303,21 @@ $packages["unicode"] = (function() {
 		this.Delta = Delta_;
 	});
 	d = $pkg.d = $newType(12, $kindArray, "unicode.d", true, "unicode", false, null);
+	foldPair = $pkg.foldPair = $newType(0, $kindStruct, "unicode.foldPair", true, "unicode", false, function(From_, To_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.From = 0;
+			this.To = 0;
+			return;
+		}
+		this.From = From_;
+		this.To = To_;
+	});
 	arrayType = $arrayType($Int32, 3);
 	sliceType = $sliceType(Range16);
 	sliceType$1 = $sliceType(Range32);
 	sliceType$3 = $sliceType(CaseRange);
+	sliceType$4 = $sliceType(foldPair);
 	to = function(_case, r, caseRange) {
 		var _case, _q, caseRange, cr, delta, hi, lo, m, r, x;
 		if (_case < 0 || 3 <= _case) {
@@ -5385,6 +5454,17 @@ $packages["unicode"] = (function() {
 		return to(_case, r, $pkg.CaseRanges);
 	};
 	$pkg.To = To;
+	ToUpper = function(r) {
+		var r;
+		if (r <= 127) {
+			if (97 <= r && r <= 122) {
+				r = r - (32) >> 0;
+			}
+			return r;
+		}
+		return To(0, r);
+	};
+	$pkg.ToUpper = ToUpper;
 	ToLower = function(r) {
 		var r;
 		if (r <= 127) {
@@ -5396,11 +5476,41 @@ $packages["unicode"] = (function() {
 		return To(1, r);
 	};
 	$pkg.ToLower = ToLower;
+	SimpleFold = function(r) {
+		var _q, hi, l, lo, m, r;
+		if (r < 0 || r > 1114111) {
+			return r;
+		}
+		if (((r >> 0)) < 128) {
+			return ((((r < 0 || r >= asciiFold.length) ? ($throwRuntimeError("index out of range"), undefined) : asciiFold[r]) >> 0));
+		}
+		lo = 0;
+		hi = caseOrbit.$length;
+		while (true) {
+			if (!(lo < hi)) { break; }
+			m = lo + (_q = ((hi - lo >> 0)) / 2, (_q === _q && _q !== 1/0 && _q !== -1/0) ? _q >> 0 : $throwRuntimeError("integer divide by zero")) >> 0;
+			if (((((m < 0 || m >= caseOrbit.$length) ? ($throwRuntimeError("index out of range"), undefined) : caseOrbit.$array[caseOrbit.$offset + m]).From >> 0)) < r) {
+				lo = m + 1 >> 0;
+			} else {
+				hi = m;
+			}
+		}
+		if (lo < caseOrbit.$length && (((((lo < 0 || lo >= caseOrbit.$length) ? ($throwRuntimeError("index out of range"), undefined) : caseOrbit.$array[caseOrbit.$offset + lo]).From >> 0)) === r)) {
+			return ((((lo < 0 || lo >= caseOrbit.$length) ? ($throwRuntimeError("index out of range"), undefined) : caseOrbit.$array[caseOrbit.$offset + lo]).To >> 0));
+		}
+		l = ToLower(r);
+		if (!((l === r))) {
+			return l;
+		}
+		return ToUpper(r);
+	};
+	$pkg.SimpleFold = SimpleFold;
 	RangeTable.init("", [{prop: "R16", name: "R16", anonymous: false, exported: true, typ: sliceType, tag: ""}, {prop: "R32", name: "R32", anonymous: false, exported: true, typ: sliceType$1, tag: ""}, {prop: "LatinOffset", name: "LatinOffset", anonymous: false, exported: true, typ: $Int, tag: ""}]);
 	Range16.init("", [{prop: "Lo", name: "Lo", anonymous: false, exported: true, typ: $Uint16, tag: ""}, {prop: "Hi", name: "Hi", anonymous: false, exported: true, typ: $Uint16, tag: ""}, {prop: "Stride", name: "Stride", anonymous: false, exported: true, typ: $Uint16, tag: ""}]);
 	Range32.init("", [{prop: "Lo", name: "Lo", anonymous: false, exported: true, typ: $Uint32, tag: ""}, {prop: "Hi", name: "Hi", anonymous: false, exported: true, typ: $Uint32, tag: ""}, {prop: "Stride", name: "Stride", anonymous: false, exported: true, typ: $Uint32, tag: ""}]);
 	CaseRange.init("", [{prop: "Lo", name: "Lo", anonymous: false, exported: true, typ: $Uint32, tag: ""}, {prop: "Hi", name: "Hi", anonymous: false, exported: true, typ: $Uint32, tag: ""}, {prop: "Delta", name: "Delta", anonymous: false, exported: true, typ: d, tag: ""}]);
 	d.init($Int32, 3);
+	foldPair.init("", [{prop: "From", name: "From", anonymous: false, exported: true, typ: $Uint16, tag: ""}, {prop: "To", name: "To", anonymous: false, exported: true, typ: $Uint16, tag: ""}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -5410,6 +5520,8 @@ $packages["unicode"] = (function() {
 		$pkg.White_Space = _White_Space;
 		_CaseRanges = new sliceType$3([new CaseRange.ptr(65, 90, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(97, 122, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(181, 181, $toNativeArray($kindInt32, [743, 0, 743])), new CaseRange.ptr(192, 214, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(216, 222, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(224, 246, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(248, 254, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(255, 255, $toNativeArray($kindInt32, [121, 0, 121])), new CaseRange.ptr(256, 303, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(304, 304, $toNativeArray($kindInt32, [0, -199, 0])), new CaseRange.ptr(305, 305, $toNativeArray($kindInt32, [-232, 0, -232])), new CaseRange.ptr(306, 311, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(313, 328, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(330, 375, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(376, 376, $toNativeArray($kindInt32, [0, -121, 0])), new CaseRange.ptr(377, 382, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(383, 383, $toNativeArray($kindInt32, [-300, 0, -300])), new CaseRange.ptr(384, 384, $toNativeArray($kindInt32, [195, 0, 195])), new CaseRange.ptr(385, 385, $toNativeArray($kindInt32, [0, 210, 0])), new CaseRange.ptr(386, 389, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(390, 390, $toNativeArray($kindInt32, [0, 206, 0])), new CaseRange.ptr(391, 392, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(393, 394, $toNativeArray($kindInt32, [0, 205, 0])), new CaseRange.ptr(395, 396, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(398, 398, $toNativeArray($kindInt32, [0, 79, 0])), new CaseRange.ptr(399, 399, $toNativeArray($kindInt32, [0, 202, 0])), new CaseRange.ptr(400, 400, $toNativeArray($kindInt32, [0, 203, 0])), new CaseRange.ptr(401, 402, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(403, 403, $toNativeArray($kindInt32, [0, 205, 0])), new CaseRange.ptr(404, 404, $toNativeArray($kindInt32, [0, 207, 0])), new CaseRange.ptr(405, 405, $toNativeArray($kindInt32, [97, 0, 97])), new CaseRange.ptr(406, 406, $toNativeArray($kindInt32, [0, 211, 0])), new CaseRange.ptr(407, 407, $toNativeArray($kindInt32, [0, 209, 0])), new CaseRange.ptr(408, 409, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(410, 410, $toNativeArray($kindInt32, [163, 0, 163])), new CaseRange.ptr(412, 412, $toNativeArray($kindInt32, [0, 211, 0])), new CaseRange.ptr(413, 413, $toNativeArray($kindInt32, [0, 213, 0])), new CaseRange.ptr(414, 414, $toNativeArray($kindInt32, [130, 0, 130])), new CaseRange.ptr(415, 415, $toNativeArray($kindInt32, [0, 214, 0])), new CaseRange.ptr(416, 421, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(422, 422, $toNativeArray($kindInt32, [0, 218, 0])), new CaseRange.ptr(423, 424, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(425, 425, $toNativeArray($kindInt32, [0, 218, 0])), new CaseRange.ptr(428, 429, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(430, 430, $toNativeArray($kindInt32, [0, 218, 0])), new CaseRange.ptr(431, 432, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(433, 434, $toNativeArray($kindInt32, [0, 217, 0])), new CaseRange.ptr(435, 438, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(439, 439, $toNativeArray($kindInt32, [0, 219, 0])), new CaseRange.ptr(440, 441, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(444, 445, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(447, 447, $toNativeArray($kindInt32, [56, 0, 56])), new CaseRange.ptr(452, 452, $toNativeArray($kindInt32, [0, 2, 1])), new CaseRange.ptr(453, 453, $toNativeArray($kindInt32, [-1, 1, 0])), new CaseRange.ptr(454, 454, $toNativeArray($kindInt32, [-2, 0, -1])), new CaseRange.ptr(455, 455, $toNativeArray($kindInt32, [0, 2, 1])), new CaseRange.ptr(456, 456, $toNativeArray($kindInt32, [-1, 1, 0])), new CaseRange.ptr(457, 457, $toNativeArray($kindInt32, [-2, 0, -1])), new CaseRange.ptr(458, 458, $toNativeArray($kindInt32, [0, 2, 1])), new CaseRange.ptr(459, 459, $toNativeArray($kindInt32, [-1, 1, 0])), new CaseRange.ptr(460, 460, $toNativeArray($kindInt32, [-2, 0, -1])), new CaseRange.ptr(461, 476, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(477, 477, $toNativeArray($kindInt32, [-79, 0, -79])), new CaseRange.ptr(478, 495, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(497, 497, $toNativeArray($kindInt32, [0, 2, 1])), new CaseRange.ptr(498, 498, $toNativeArray($kindInt32, [-1, 1, 0])), new CaseRange.ptr(499, 499, $toNativeArray($kindInt32, [-2, 0, -1])), new CaseRange.ptr(500, 501, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(502, 502, $toNativeArray($kindInt32, [0, -97, 0])), new CaseRange.ptr(503, 503, $toNativeArray($kindInt32, [0, -56, 0])), new CaseRange.ptr(504, 543, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(544, 544, $toNativeArray($kindInt32, [0, -130, 0])), new CaseRange.ptr(546, 563, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(570, 570, $toNativeArray($kindInt32, [0, 10795, 0])), new CaseRange.ptr(571, 572, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(573, 573, $toNativeArray($kindInt32, [0, -163, 0])), new CaseRange.ptr(574, 574, $toNativeArray($kindInt32, [0, 10792, 0])), new CaseRange.ptr(575, 576, $toNativeArray($kindInt32, [10815, 0, 10815])), new CaseRange.ptr(577, 578, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(579, 579, $toNativeArray($kindInt32, [0, -195, 0])), new CaseRange.ptr(580, 580, $toNativeArray($kindInt32, [0, 69, 0])), new CaseRange.ptr(581, 581, $toNativeArray($kindInt32, [0, 71, 0])), new CaseRange.ptr(582, 591, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(592, 592, $toNativeArray($kindInt32, [10783, 0, 10783])), new CaseRange.ptr(593, 593, $toNativeArray($kindInt32, [10780, 0, 10780])), new CaseRange.ptr(594, 594, $toNativeArray($kindInt32, [10782, 0, 10782])), new CaseRange.ptr(595, 595, $toNativeArray($kindInt32, [-210, 0, -210])), new CaseRange.ptr(596, 596, $toNativeArray($kindInt32, [-206, 0, -206])), new CaseRange.ptr(598, 599, $toNativeArray($kindInt32, [-205, 0, -205])), new CaseRange.ptr(601, 601, $toNativeArray($kindInt32, [-202, 0, -202])), new CaseRange.ptr(603, 603, $toNativeArray($kindInt32, [-203, 0, -203])), new CaseRange.ptr(604, 604, $toNativeArray($kindInt32, [42319, 0, 42319])), new CaseRange.ptr(608, 608, $toNativeArray($kindInt32, [-205, 0, -205])), new CaseRange.ptr(609, 609, $toNativeArray($kindInt32, [42315, 0, 42315])), new CaseRange.ptr(611, 611, $toNativeArray($kindInt32, [-207, 0, -207])), new CaseRange.ptr(613, 613, $toNativeArray($kindInt32, [42280, 0, 42280])), new CaseRange.ptr(614, 614, $toNativeArray($kindInt32, [42308, 0, 42308])), new CaseRange.ptr(616, 616, $toNativeArray($kindInt32, [-209, 0, -209])), new CaseRange.ptr(617, 617, $toNativeArray($kindInt32, [-211, 0, -211])), new CaseRange.ptr(618, 618, $toNativeArray($kindInt32, [42308, 0, 42308])), new CaseRange.ptr(619, 619, $toNativeArray($kindInt32, [10743, 0, 10743])), new CaseRange.ptr(620, 620, $toNativeArray($kindInt32, [42305, 0, 42305])), new CaseRange.ptr(623, 623, $toNativeArray($kindInt32, [-211, 0, -211])), new CaseRange.ptr(625, 625, $toNativeArray($kindInt32, [10749, 0, 10749])), new CaseRange.ptr(626, 626, $toNativeArray($kindInt32, [-213, 0, -213])), new CaseRange.ptr(629, 629, $toNativeArray($kindInt32, [-214, 0, -214])), new CaseRange.ptr(637, 637, $toNativeArray($kindInt32, [10727, 0, 10727])), new CaseRange.ptr(640, 640, $toNativeArray($kindInt32, [-218, 0, -218])), new CaseRange.ptr(643, 643, $toNativeArray($kindInt32, [-218, 0, -218])), new CaseRange.ptr(647, 647, $toNativeArray($kindInt32, [42282, 0, 42282])), new CaseRange.ptr(648, 648, $toNativeArray($kindInt32, [-218, 0, -218])), new CaseRange.ptr(649, 649, $toNativeArray($kindInt32, [-69, 0, -69])), new CaseRange.ptr(650, 651, $toNativeArray($kindInt32, [-217, 0, -217])), new CaseRange.ptr(652, 652, $toNativeArray($kindInt32, [-71, 0, -71])), new CaseRange.ptr(658, 658, $toNativeArray($kindInt32, [-219, 0, -219])), new CaseRange.ptr(669, 669, $toNativeArray($kindInt32, [42261, 0, 42261])), new CaseRange.ptr(670, 670, $toNativeArray($kindInt32, [42258, 0, 42258])), new CaseRange.ptr(837, 837, $toNativeArray($kindInt32, [84, 0, 84])), new CaseRange.ptr(880, 883, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(886, 887, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(891, 893, $toNativeArray($kindInt32, [130, 0, 130])), new CaseRange.ptr(895, 895, $toNativeArray($kindInt32, [0, 116, 0])), new CaseRange.ptr(902, 902, $toNativeArray($kindInt32, [0, 38, 0])), new CaseRange.ptr(904, 906, $toNativeArray($kindInt32, [0, 37, 0])), new CaseRange.ptr(908, 908, $toNativeArray($kindInt32, [0, 64, 0])), new CaseRange.ptr(910, 911, $toNativeArray($kindInt32, [0, 63, 0])), new CaseRange.ptr(913, 929, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(931, 939, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(940, 940, $toNativeArray($kindInt32, [-38, 0, -38])), new CaseRange.ptr(941, 943, $toNativeArray($kindInt32, [-37, 0, -37])), new CaseRange.ptr(945, 961, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(962, 962, $toNativeArray($kindInt32, [-31, 0, -31])), new CaseRange.ptr(963, 971, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(972, 972, $toNativeArray($kindInt32, [-64, 0, -64])), new CaseRange.ptr(973, 974, $toNativeArray($kindInt32, [-63, 0, -63])), new CaseRange.ptr(975, 975, $toNativeArray($kindInt32, [0, 8, 0])), new CaseRange.ptr(976, 976, $toNativeArray($kindInt32, [-62, 0, -62])), new CaseRange.ptr(977, 977, $toNativeArray($kindInt32, [-57, 0, -57])), new CaseRange.ptr(981, 981, $toNativeArray($kindInt32, [-47, 0, -47])), new CaseRange.ptr(982, 982, $toNativeArray($kindInt32, [-54, 0, -54])), new CaseRange.ptr(983, 983, $toNativeArray($kindInt32, [-8, 0, -8])), new CaseRange.ptr(984, 1007, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(1008, 1008, $toNativeArray($kindInt32, [-86, 0, -86])), new CaseRange.ptr(1009, 1009, $toNativeArray($kindInt32, [-80, 0, -80])), new CaseRange.ptr(1010, 1010, $toNativeArray($kindInt32, [7, 0, 7])), new CaseRange.ptr(1011, 1011, $toNativeArray($kindInt32, [-116, 0, -116])), new CaseRange.ptr(1012, 1012, $toNativeArray($kindInt32, [0, -60, 0])), new CaseRange.ptr(1013, 1013, $toNativeArray($kindInt32, [-96, 0, -96])), new CaseRange.ptr(1015, 1016, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(1017, 1017, $toNativeArray($kindInt32, [0, -7, 0])), new CaseRange.ptr(1018, 1019, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(1021, 1023, $toNativeArray($kindInt32, [0, -130, 0])), new CaseRange.ptr(1024, 1039, $toNativeArray($kindInt32, [0, 80, 0])), new CaseRange.ptr(1040, 1071, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(1072, 1103, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(1104, 1119, $toNativeArray($kindInt32, [-80, 0, -80])), new CaseRange.ptr(1120, 1153, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(1162, 1215, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(1216, 1216, $toNativeArray($kindInt32, [0, 15, 0])), new CaseRange.ptr(1217, 1230, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(1231, 1231, $toNativeArray($kindInt32, [-15, 0, -15])), new CaseRange.ptr(1232, 1327, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(1329, 1366, $toNativeArray($kindInt32, [0, 48, 0])), new CaseRange.ptr(1377, 1414, $toNativeArray($kindInt32, [-48, 0, -48])), new CaseRange.ptr(4256, 4293, $toNativeArray($kindInt32, [0, 7264, 0])), new CaseRange.ptr(4295, 4295, $toNativeArray($kindInt32, [0, 7264, 0])), new CaseRange.ptr(4301, 4301, $toNativeArray($kindInt32, [0, 7264, 0])), new CaseRange.ptr(5024, 5103, $toNativeArray($kindInt32, [0, 38864, 0])), new CaseRange.ptr(5104, 5109, $toNativeArray($kindInt32, [0, 8, 0])), new CaseRange.ptr(5112, 5117, $toNativeArray($kindInt32, [-8, 0, -8])), new CaseRange.ptr(7296, 7296, $toNativeArray($kindInt32, [-6254, 0, -6254])), new CaseRange.ptr(7297, 7297, $toNativeArray($kindInt32, [-6253, 0, -6253])), new CaseRange.ptr(7298, 7298, $toNativeArray($kindInt32, [-6244, 0, -6244])), new CaseRange.ptr(7299, 7300, $toNativeArray($kindInt32, [-6242, 0, -6242])), new CaseRange.ptr(7301, 7301, $toNativeArray($kindInt32, [-6243, 0, -6243])), new CaseRange.ptr(7302, 7302, $toNativeArray($kindInt32, [-6236, 0, -6236])), new CaseRange.ptr(7303, 7303, $toNativeArray($kindInt32, [-6181, 0, -6181])), new CaseRange.ptr(7304, 7304, $toNativeArray($kindInt32, [35266, 0, 35266])), new CaseRange.ptr(7545, 7545, $toNativeArray($kindInt32, [35332, 0, 35332])), new CaseRange.ptr(7549, 7549, $toNativeArray($kindInt32, [3814, 0, 3814])), new CaseRange.ptr(7680, 7829, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(7835, 7835, $toNativeArray($kindInt32, [-59, 0, -59])), new CaseRange.ptr(7838, 7838, $toNativeArray($kindInt32, [0, -7615, 0])), new CaseRange.ptr(7840, 7935, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(7936, 7943, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(7944, 7951, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(7952, 7957, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(7960, 7965, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(7968, 7975, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(7976, 7983, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(7984, 7991, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(7992, 7999, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8000, 8005, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8008, 8013, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8017, 8017, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8019, 8019, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8021, 8021, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8023, 8023, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8025, 8025, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8027, 8027, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8029, 8029, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8031, 8031, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8032, 8039, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8040, 8047, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8048, 8049, $toNativeArray($kindInt32, [74, 0, 74])), new CaseRange.ptr(8050, 8053, $toNativeArray($kindInt32, [86, 0, 86])), new CaseRange.ptr(8054, 8055, $toNativeArray($kindInt32, [100, 0, 100])), new CaseRange.ptr(8056, 8057, $toNativeArray($kindInt32, [128, 0, 128])), new CaseRange.ptr(8058, 8059, $toNativeArray($kindInt32, [112, 0, 112])), new CaseRange.ptr(8060, 8061, $toNativeArray($kindInt32, [126, 0, 126])), new CaseRange.ptr(8064, 8071, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8072, 8079, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8080, 8087, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8088, 8095, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8096, 8103, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8104, 8111, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8112, 8113, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8115, 8115, $toNativeArray($kindInt32, [9, 0, 9])), new CaseRange.ptr(8120, 8121, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8122, 8123, $toNativeArray($kindInt32, [0, -74, 0])), new CaseRange.ptr(8124, 8124, $toNativeArray($kindInt32, [0, -9, 0])), new CaseRange.ptr(8126, 8126, $toNativeArray($kindInt32, [-7205, 0, -7205])), new CaseRange.ptr(8131, 8131, $toNativeArray($kindInt32, [9, 0, 9])), new CaseRange.ptr(8136, 8139, $toNativeArray($kindInt32, [0, -86, 0])), new CaseRange.ptr(8140, 8140, $toNativeArray($kindInt32, [0, -9, 0])), new CaseRange.ptr(8144, 8145, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8152, 8153, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8154, 8155, $toNativeArray($kindInt32, [0, -100, 0])), new CaseRange.ptr(8160, 8161, $toNativeArray($kindInt32, [8, 0, 8])), new CaseRange.ptr(8165, 8165, $toNativeArray($kindInt32, [7, 0, 7])), new CaseRange.ptr(8168, 8169, $toNativeArray($kindInt32, [0, -8, 0])), new CaseRange.ptr(8170, 8171, $toNativeArray($kindInt32, [0, -112, 0])), new CaseRange.ptr(8172, 8172, $toNativeArray($kindInt32, [0, -7, 0])), new CaseRange.ptr(8179, 8179, $toNativeArray($kindInt32, [9, 0, 9])), new CaseRange.ptr(8184, 8185, $toNativeArray($kindInt32, [0, -128, 0])), new CaseRange.ptr(8186, 8187, $toNativeArray($kindInt32, [0, -126, 0])), new CaseRange.ptr(8188, 8188, $toNativeArray($kindInt32, [0, -9, 0])), new CaseRange.ptr(8486, 8486, $toNativeArray($kindInt32, [0, -7517, 0])), new CaseRange.ptr(8490, 8490, $toNativeArray($kindInt32, [0, -8383, 0])), new CaseRange.ptr(8491, 8491, $toNativeArray($kindInt32, [0, -8262, 0])), new CaseRange.ptr(8498, 8498, $toNativeArray($kindInt32, [0, 28, 0])), new CaseRange.ptr(8526, 8526, $toNativeArray($kindInt32, [-28, 0, -28])), new CaseRange.ptr(8544, 8559, $toNativeArray($kindInt32, [0, 16, 0])), new CaseRange.ptr(8560, 8575, $toNativeArray($kindInt32, [-16, 0, -16])), new CaseRange.ptr(8579, 8580, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(9398, 9423, $toNativeArray($kindInt32, [0, 26, 0])), new CaseRange.ptr(9424, 9449, $toNativeArray($kindInt32, [-26, 0, -26])), new CaseRange.ptr(11264, 11310, $toNativeArray($kindInt32, [0, 48, 0])), new CaseRange.ptr(11312, 11358, $toNativeArray($kindInt32, [-48, 0, -48])), new CaseRange.ptr(11360, 11361, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(11362, 11362, $toNativeArray($kindInt32, [0, -10743, 0])), new CaseRange.ptr(11363, 11363, $toNativeArray($kindInt32, [0, -3814, 0])), new CaseRange.ptr(11364, 11364, $toNativeArray($kindInt32, [0, -10727, 0])), new CaseRange.ptr(11365, 11365, $toNativeArray($kindInt32, [-10795, 0, -10795])), new CaseRange.ptr(11366, 11366, $toNativeArray($kindInt32, [-10792, 0, -10792])), new CaseRange.ptr(11367, 11372, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(11373, 11373, $toNativeArray($kindInt32, [0, -10780, 0])), new CaseRange.ptr(11374, 11374, $toNativeArray($kindInt32, [0, -10749, 0])), new CaseRange.ptr(11375, 11375, $toNativeArray($kindInt32, [0, -10783, 0])), new CaseRange.ptr(11376, 11376, $toNativeArray($kindInt32, [0, -10782, 0])), new CaseRange.ptr(11378, 11379, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(11381, 11382, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(11390, 11391, $toNativeArray($kindInt32, [0, -10815, 0])), new CaseRange.ptr(11392, 11491, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(11499, 11502, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(11506, 11507, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(11520, 11557, $toNativeArray($kindInt32, [-7264, 0, -7264])), new CaseRange.ptr(11559, 11559, $toNativeArray($kindInt32, [-7264, 0, -7264])), new CaseRange.ptr(11565, 11565, $toNativeArray($kindInt32, [-7264, 0, -7264])), new CaseRange.ptr(42560, 42605, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42624, 42651, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42786, 42799, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42802, 42863, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42873, 42876, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42877, 42877, $toNativeArray($kindInt32, [0, -35332, 0])), new CaseRange.ptr(42878, 42887, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42891, 42892, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42893, 42893, $toNativeArray($kindInt32, [0, -42280, 0])), new CaseRange.ptr(42896, 42899, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42902, 42921, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(42922, 42922, $toNativeArray($kindInt32, [0, -42308, 0])), new CaseRange.ptr(42923, 42923, $toNativeArray($kindInt32, [0, -42319, 0])), new CaseRange.ptr(42924, 42924, $toNativeArray($kindInt32, [0, -42315, 0])), new CaseRange.ptr(42925, 42925, $toNativeArray($kindInt32, [0, -42305, 0])), new CaseRange.ptr(42926, 42926, $toNativeArray($kindInt32, [0, -42308, 0])), new CaseRange.ptr(42928, 42928, $toNativeArray($kindInt32, [0, -42258, 0])), new CaseRange.ptr(42929, 42929, $toNativeArray($kindInt32, [0, -42282, 0])), new CaseRange.ptr(42930, 42930, $toNativeArray($kindInt32, [0, -42261, 0])), new CaseRange.ptr(42931, 42931, $toNativeArray($kindInt32, [0, 928, 0])), new CaseRange.ptr(42932, 42935, $toNativeArray($kindInt32, [1114112, 1114112, 1114112])), new CaseRange.ptr(43859, 43859, $toNativeArray($kindInt32, [-928, 0, -928])), new CaseRange.ptr(43888, 43967, $toNativeArray($kindInt32, [-38864, 0, -38864])), new CaseRange.ptr(65313, 65338, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(65345, 65370, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(66560, 66599, $toNativeArray($kindInt32, [0, 40, 0])), new CaseRange.ptr(66600, 66639, $toNativeArray($kindInt32, [-40, 0, -40])), new CaseRange.ptr(66736, 66771, $toNativeArray($kindInt32, [0, 40, 0])), new CaseRange.ptr(66776, 66811, $toNativeArray($kindInt32, [-40, 0, -40])), new CaseRange.ptr(68736, 68786, $toNativeArray($kindInt32, [0, 64, 0])), new CaseRange.ptr(68800, 68850, $toNativeArray($kindInt32, [-64, 0, -64])), new CaseRange.ptr(71840, 71871, $toNativeArray($kindInt32, [0, 32, 0])), new CaseRange.ptr(71872, 71903, $toNativeArray($kindInt32, [-32, 0, -32])), new CaseRange.ptr(125184, 125217, $toNativeArray($kindInt32, [0, 34, 0])), new CaseRange.ptr(125218, 125251, $toNativeArray($kindInt32, [-34, 0, -34]))]);
 		$pkg.CaseRanges = _CaseRanges;
+		asciiFold = $toNativeArray($kindUint16, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 91, 92, 93, 94, 95, 96, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 8490, 76, 77, 78, 79, 80, 81, 82, 383, 84, 85, 86, 87, 88, 89, 90, 123, 124, 125, 126, 127]);
+		caseOrbit = new sliceType$4([new foldPair.ptr(75, 107), new foldPair.ptr(83, 115), new foldPair.ptr(107, 8490), new foldPair.ptr(115, 383), new foldPair.ptr(181, 924), new foldPair.ptr(197, 229), new foldPair.ptr(223, 7838), new foldPair.ptr(229, 8491), new foldPair.ptr(304, 304), new foldPair.ptr(305, 305), new foldPair.ptr(383, 83), new foldPair.ptr(452, 453), new foldPair.ptr(453, 454), new foldPair.ptr(454, 452), new foldPair.ptr(455, 456), new foldPair.ptr(456, 457), new foldPair.ptr(457, 455), new foldPair.ptr(458, 459), new foldPair.ptr(459, 460), new foldPair.ptr(460, 458), new foldPair.ptr(497, 498), new foldPair.ptr(498, 499), new foldPair.ptr(499, 497), new foldPair.ptr(837, 921), new foldPair.ptr(914, 946), new foldPair.ptr(917, 949), new foldPair.ptr(920, 952), new foldPair.ptr(921, 953), new foldPair.ptr(922, 954), new foldPair.ptr(924, 956), new foldPair.ptr(928, 960), new foldPair.ptr(929, 961), new foldPair.ptr(931, 962), new foldPair.ptr(934, 966), new foldPair.ptr(937, 969), new foldPair.ptr(946, 976), new foldPair.ptr(949, 1013), new foldPair.ptr(952, 977), new foldPair.ptr(953, 8126), new foldPair.ptr(954, 1008), new foldPair.ptr(956, 181), new foldPair.ptr(960, 982), new foldPair.ptr(961, 1009), new foldPair.ptr(962, 963), new foldPair.ptr(963, 931), new foldPair.ptr(966, 981), new foldPair.ptr(969, 8486), new foldPair.ptr(976, 914), new foldPair.ptr(977, 1012), new foldPair.ptr(981, 934), new foldPair.ptr(982, 928), new foldPair.ptr(1008, 922), new foldPair.ptr(1009, 929), new foldPair.ptr(1012, 920), new foldPair.ptr(1013, 917), new foldPair.ptr(1042, 1074), new foldPair.ptr(1044, 1076), new foldPair.ptr(1054, 1086), new foldPair.ptr(1057, 1089), new foldPair.ptr(1058, 1090), new foldPair.ptr(1066, 1098), new foldPair.ptr(1074, 7296), new foldPair.ptr(1076, 7297), new foldPair.ptr(1086, 7298), new foldPair.ptr(1089, 7299), new foldPair.ptr(1090, 7300), new foldPair.ptr(1098, 7302), new foldPair.ptr(1122, 1123), new foldPair.ptr(1123, 7303), new foldPair.ptr(7296, 1042), new foldPair.ptr(7297, 1044), new foldPair.ptr(7298, 1054), new foldPair.ptr(7299, 1057), new foldPair.ptr(7300, 7301), new foldPair.ptr(7301, 1058), new foldPair.ptr(7302, 1066), new foldPair.ptr(7303, 1122), new foldPair.ptr(7304, 42570), new foldPair.ptr(7776, 7777), new foldPair.ptr(7777, 7835), new foldPair.ptr(7835, 7776), new foldPair.ptr(7838, 223), new foldPair.ptr(8126, 837), new foldPair.ptr(8486, 937), new foldPair.ptr(8490, 75), new foldPair.ptr(8491, 197), new foldPair.ptr(42570, 42571), new foldPair.ptr(42571, 7304)]);
 		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.$init = $init;
@@ -6704,7 +6816,7 @@ $packages["github.com/funnelorg/funnel/run"] = (function() {
 	return $pkg;
 })();
 $packages["github.com/funnelorg/funnel/builtin"] = (function() {
-	var $pkg = {}, $init, parse, run, strconv, Number, callable, invocation, sliceType, funcType, mapType, sliceType$1, ptrType, ptrType$1, sliceType$2, ptrType$2, sliceType$3, ptrType$3, numberf, add, isMissingTerm, sub, mult, div, compare, more, less, gte, lte, equals, notEquals, and, or, dot, errorInternal, errorf, fun, iff, stringf;
+	var $pkg = {}, $init, parse, run, strconv, Number, canCallResolved, callable, invocation, sliceType, funcType, mapType, sliceType$1, ptrType, ptrType$1, sliceType$2, funcType$1, sliceType$3, ptrType$2, ptrType$3, numberf, add, isMissingTerm, sub, mult, div, compare, more, less, gte, lte, equals, notEquals, and, or, dot, getFromScope, errorInternal, errorf, fun, iff, stringf;
 	parse = $packages["github.com/funnelorg/funnel/parse"];
 	run = $packages["github.com/funnelorg/funnel/run"];
 	strconv = $packages["strconv"];
@@ -6716,10 +6828,11 @@ $packages["github.com/funnelorg/funnel/builtin"] = (function() {
 		}
 		this.F = F_;
 	});
+	canCallResolved = $pkg.canCallResolved = $newType(8, $kindInterface, "builtin.canCallResolved", true, "github.com/funnelorg/funnel/builtin", false, null);
 	callable = $pkg.callable = $newType(0, $kindStruct, "builtin.callable", true, "github.com/funnelorg/funnel/builtin", false, function(params_, expr_, s_) {
 		this.$val = this;
 		if (arguments.length === 0) {
-			this.params = sliceType$2.nil;
+			this.params = sliceType$3.nil;
 			this.expr = new parse.Node.ptr(ptrType.nil, ptrType$1.nil, ptrType$2.nil);
 			this.s = $ifaceNil;
 			return;
@@ -6732,7 +6845,7 @@ $packages["github.com/funnelorg/funnel/builtin"] = (function() {
 		this.$val = this;
 		if (arguments.length === 0) {
 			this.callable = ptrType$3.nil;
-			this.args = sliceType$3.nil;
+			this.args = sliceType$2.nil;
 			return;
 		}
 		this.callable = callable_;
@@ -6744,9 +6857,10 @@ $packages["github.com/funnelorg/funnel/builtin"] = (function() {
 	sliceType$1 = $sliceType(mapType);
 	ptrType = $ptrType(parse.Token);
 	ptrType$1 = $ptrType(parse.Call);
-	sliceType$2 = $sliceType($String);
+	sliceType$2 = $sliceType($emptyInterface);
+	funcType$1 = $funcType([sliceType$2], [$emptyInterface], false);
+	sliceType$3 = $sliceType($String);
 	ptrType$2 = $ptrType(parse.Map);
-	sliceType$3 = $sliceType($emptyInterface);
 	ptrType$3 = $ptrType(callable);
 	numberf = function(s, args) {
 		var _tuple, args, err, ff, s, x;
@@ -7080,8 +7194,8 @@ $packages["github.com/funnelorg/funnel/builtin"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: or }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._ref$1 = _ref$1; $f.arg = arg; $f.args = args; $f.e = e; $f.r = r; $f.s = s; $f.t = t; $f.t$1 = t$1; $f.t$2 = t$2; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	dot = function(s, args) {
-		var _i, _r, _r$1, _r$2, _ref, _ref$1, _tuple, args, err, key, next, ok, r, result, s, sx, sx$1, sx$2, $s, $r;
-		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _ref$1 = $f._ref$1; _tuple = $f._tuple; args = $f.args; err = $f.err; key = $f.key; next = $f.next; ok = $f.ok; r = $f.r; result = $f.result; s = $f.s; sx = $f.sx; sx$1 = $f.sx$1; sx$2 = $f.sx$2; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		var _i, _r, _r$1, _r$2, _ref, _tuple, args, err, key, next, ok, r, result, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _tuple = $f._tuple; args = $f.args; err = $f.err; key = $f.key; next = $f.next; ok = $f.ok; r = $f.r; result = $f.result; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
 		r = new run.Runner.ptr();
 		_r = r.LazyRun(s, $clone((0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]), parse.Node)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
 		result = _r;
@@ -7106,26 +7220,58 @@ $packages["github.com/funnelorg/funnel/builtin"] = (function() {
 			if (ok) {
 				$s = -1; return err;
 			}
-			_ref$1 = result;
-			/* */ if ($assertType(_ref$1, run.Scope, true)[1]) { $s = 8; continue; }
-			/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 9; continue; }
-			/* */ $s = 10; continue;
-			/* if ($assertType(_ref$1, run.Scope, true)[1]) { */ case 8:
-				sx = _ref$1;
-				_r$2 = sx.Get(key); /* */ $s = 12; case 12: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
-				result = _r$2;
-				$s = 11; continue;
-			/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 9:
-				sx$1 = _ref$1;
-				$s = -1; return sx$1;
-			/* } else { */ case 10:
-				sx$2 = _ref$1;
-				$s = -1; return new run.ErrorStack.ptr("cannot use dot with non-map", "", 0, $ifaceNil);
-			/* } */ case 11:
+			_r$2 = getFromScope(s, result, key); /* */ $s = 8; case 8: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+			result = _r$2;
 			_i++;
 		/* } */ $s = 2; continue; case 3:
 		$s = -1; return result;
-		/* */ } return; } if ($f === undefined) { $f = { $blk: dot }; } $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._ref$1 = _ref$1; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.key = key; $f.next = next; $f.ok = ok; $f.r = r; $f.result = result; $f.s = s; $f.sx = sx; $f.sx$1 = sx$1; $f.sx$2 = sx$2; $f.$s = $s; $f.$r = $r; return $f;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: dot }; } $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._tuple = _tuple; $f.args = args; $f.err = err; $f.key = key; $f.next = next; $f.ok = ok; $f.r = r; $f.result = result; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	getFromScope = function(base, s, key) {
+		var _r, _r$1, _r$2, _r$3, _ref, _ref$1, _tuple, base, c, c$1, key, ok, s, str, sx, sx$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _ref = $f._ref; _ref$1 = $f._ref$1; _tuple = $f._tuple; base = $f.base; c = $f.c; c$1 = $f.c$1; key = $f.key; ok = $f.ok; s = $f.s; str = $f.str; sx = $f.sx; sx$1 = $f.sx$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_tuple = $assertType(key, $String, true);
+		str = _tuple[0];
+		ok = _tuple[1];
+		/* */ if (ok && !(str === "")) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (ok && !(str === "")) { */ case 1:
+			/* */ if (str.charCodeAt(0) === 35) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (str.charCodeAt(0) === 35) { */ case 3:
+				key = new $String($substring(str, 1));
+				$s = 5; continue;
+			/* } else { */ case 4:
+				_r = base.Get(new $String("@" + str)); /* */ $s = 6; case 6: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				_ref = _r;
+				/* */ if ($assertType(_ref, funcType$1, true)[1]) { $s = 7; continue; }
+				/* */ if ($assertType(_ref, canCallResolved, true)[1]) { $s = 8; continue; }
+				/* */ $s = 9; continue;
+				/* if ($assertType(_ref, funcType$1, true)[1]) { */ case 7:
+					c = _ref.$val;
+					_r$1 = c(new sliceType$2([s])); /* */ $s = 10; case 10: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+					$s = -1; return _r$1;
+				/* } else if ($assertType(_ref, canCallResolved, true)[1]) { */ case 8:
+					c$1 = _ref;
+					_r$2 = c$1.CallResolved(new sliceType$2([s])); /* */ $s = 11; case 11: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+					$s = -1; return _r$2;
+				/* } */ case 9:
+			/* } */ case 5:
+		/* } */ case 2:
+		_ref$1 = s;
+		/* */ if ($assertType(_ref$1, run.Scope, true)[1]) { $s = 12; continue; }
+		/* */ if ($assertType(_ref$1, $error, true)[1]) { $s = 13; continue; }
+		/* */ $s = 14; continue;
+		/* if ($assertType(_ref$1, run.Scope, true)[1]) { */ case 12:
+			sx = _ref$1;
+			_r$3 = sx.Get(key); /* */ $s = 15; case 15: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+			$s = -1; return _r$3;
+		/* } else if ($assertType(_ref$1, $error, true)[1]) { */ case 13:
+			sx$1 = _ref$1;
+			$s = -1; return sx$1;
+		/* } */ case 14:
+		$s = -1; return new run.ErrorStack.ptr("cannot use dot with non-map", "", 0, $ifaceNil);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: getFromScope }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._ref = _ref; $f._ref$1 = _ref$1; $f._tuple = _tuple; $f.base = base; $f.c = c; $f.c$1 = c$1; $f.key = key; $f.ok = ok; $f.s = s; $f.str = str; $f.sx = sx; $f.sx$1 = sx$1; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	errorInternal = function(s, args) {
 		var args, s;
@@ -7165,7 +7311,7 @@ $packages["github.com/funnelorg/funnel/builtin"] = (function() {
 				return $ifaceNil;
 			}));
 		}
-		params = new sliceType$2([]);
+		params = new sliceType$3([]);
 		_ref = $subslice(args, 0, (args.$length - 1 >> 0));
 		_i = 0;
 		while (true) {
@@ -7264,11 +7410,12 @@ $packages["github.com/funnelorg/funnel/builtin"] = (function() {
 		}
 		return new run.ErrorStack.ptr("unknown error", "", 0, $ifaceNil);
 	};
-	ptrType$3.methods = [{prop: "Call", name: "Call", pkg: "", typ: $funcType([run.Scope, sliceType], [$emptyInterface], false)}, {prop: "CallResolved", name: "CallResolved", pkg: "", typ: $funcType([sliceType$3], [$emptyInterface], false)}];
+	ptrType$3.methods = [{prop: "Call", name: "Call", pkg: "", typ: $funcType([run.Scope, sliceType], [$emptyInterface], false)}, {prop: "CallResolved", name: "CallResolved", pkg: "", typ: $funcType([sliceType$2], [$emptyInterface], false)}];
 	invocation.methods = [{prop: "Get", name: "Get", pkg: "", typ: $funcType([$emptyInterface], [$emptyInterface], false)}];
 	Number.init("", [{prop: "F", name: "F", anonymous: false, exported: true, typ: $Float64, tag: ""}]);
-	callable.init("github.com/funnelorg/funnel/builtin", [{prop: "params", name: "params", anonymous: false, exported: false, typ: sliceType$2, tag: ""}, {prop: "expr", name: "expr", anonymous: false, exported: false, typ: parse.Node, tag: ""}, {prop: "s", name: "s", anonymous: false, exported: false, typ: run.Scope, tag: ""}]);
-	invocation.init("github.com/funnelorg/funnel/builtin", [{prop: "callable", name: "callable", anonymous: true, exported: false, typ: ptrType$3, tag: ""}, {prop: "args", name: "args", anonymous: false, exported: false, typ: sliceType$3, tag: ""}]);
+	canCallResolved.init([{prop: "CallResolved", name: "CallResolved", pkg: "", typ: $funcType([sliceType$2], [$emptyInterface], false)}]);
+	callable.init("github.com/funnelorg/funnel/builtin", [{prop: "params", name: "params", anonymous: false, exported: false, typ: sliceType$3, tag: ""}, {prop: "expr", name: "expr", anonymous: false, exported: false, typ: parse.Node, tag: ""}, {prop: "s", name: "s", anonymous: false, exported: false, typ: run.Scope, tag: ""}]);
+	invocation.init("github.com/funnelorg/funnel/builtin", [{prop: "callable", name: "callable", anonymous: true, exported: false, typ: ptrType$3, tag: ""}, {prop: "args", name: "args", anonymous: false, exported: false, typ: sliceType$2, tag: ""}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -9179,17 +9326,44 @@ $packages["sync"] = (function() {
 	return $pkg;
 })();
 $packages["io"] = (function() {
-	var $pkg = {}, $init, errors, sync, atomic, Reader, Writer, RuneScanner, sliceType, errWhence, errOffset;
+	var $pkg = {}, $init, errors, sync, atomic, Reader, Writer, RuneScanner, stringWriter, sliceType, errWhence, errOffset, WriteString;
 	errors = $packages["errors"];
 	sync = $packages["sync"];
 	atomic = $packages["sync/atomic"];
 	Reader = $pkg.Reader = $newType(8, $kindInterface, "io.Reader", true, "io", true, null);
 	Writer = $pkg.Writer = $newType(8, $kindInterface, "io.Writer", true, "io", true, null);
 	RuneScanner = $pkg.RuneScanner = $newType(8, $kindInterface, "io.RuneScanner", true, "io", true, null);
+	stringWriter = $pkg.stringWriter = $newType(8, $kindInterface, "io.stringWriter", true, "io", false, null);
 	sliceType = $sliceType($Uint8);
+	WriteString = function(w, s) {
+		var _r, _r$1, _tuple, _tuple$1, _tuple$2, err, n, ok, s, sw, w, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; _tuple$2 = $f._tuple$2; err = $f.err; n = $f.n; ok = $f.ok; s = $f.s; sw = $f.sw; w = $f.w; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		n = 0;
+		err = $ifaceNil;
+		_tuple = $assertType(w, stringWriter, true);
+		sw = _tuple[0];
+		ok = _tuple[1];
+		/* */ if (ok) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (ok) { */ case 1:
+			_r = sw.WriteString(s); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_tuple$1 = _r;
+			n = _tuple$1[0];
+			err = _tuple$1[1];
+			$s = -1; return [n, err];
+		/* } */ case 2:
+		_r$1 = w.Write((new sliceType($stringToBytes(s)))); /* */ $s = 4; case 4: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		_tuple$2 = _r$1;
+		n = _tuple$2[0];
+		err = _tuple$2[1];
+		$s = -1; return [n, err];
+		/* */ } return; } if ($f === undefined) { $f = { $blk: WriteString }; } $f._r = _r; $f._r$1 = _r$1; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f._tuple$2 = _tuple$2; $f.err = err; $f.n = n; $f.ok = ok; $f.s = s; $f.sw = sw; $f.w = w; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.WriteString = WriteString;
 	Reader.init([{prop: "Read", name: "Read", pkg: "", typ: $funcType([sliceType], [$Int, $error], false)}]);
 	Writer.init([{prop: "Write", name: "Write", pkg: "", typ: $funcType([sliceType], [$Int, $error], false)}]);
 	RuneScanner.init([{prop: "ReadRune", name: "ReadRune", pkg: "", typ: $funcType([], [$Int32, $Int, $error], false)}, {prop: "UnreadRune", name: "UnreadRune", pkg: "", typ: $funcType([], [$error], false)}]);
+	stringWriter.init([{prop: "WriteString", name: "WriteString", pkg: "", typ: $funcType([$String], [$Int, $error], false)}]);
 	$init = function() {
 		$pkg.$init = function() {};
 		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
@@ -9210,7 +9384,7 @@ $packages["io"] = (function() {
 	return $pkg;
 })();
 $packages["bytes"] = (function() {
-	var $pkg = {}, $init, errors, io, unicode, utf8, Buffer, readOp, ptrType, sliceType, arrayType, errNegativeRead, IndexByte, makeSlice;
+	var $pkg = {}, $init, errors, io, unicode, utf8, Buffer, readOp, ptrType, sliceType, arrayType, errNegativeRead, IndexByte, Equal, makeSlice, NewBufferString, countGeneric, Contains, Replace, indexRabinKarp, hashStr, Index, Count;
 	errors = $packages["errors"];
 	io = $packages["io"];
 	unicode = $packages["unicode"];
@@ -9249,6 +9423,25 @@ $packages["bytes"] = (function() {
 		return -1;
 	};
 	$pkg.IndexByte = IndexByte;
+	Equal = function(a, b) {
+		var _i, _ref, a, b, c, i;
+		if (!((a.$length === b.$length))) {
+			return false;
+		}
+		_ref = a;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			c = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (!((c === ((i < 0 || i >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + i])))) {
+				return false;
+			}
+			_i++;
+		}
+		return true;
+	};
+	$pkg.Equal = Equal;
 	Buffer.ptr.prototype.Bytes = function() {
 		var b;
 		b = this;
@@ -9712,6 +9905,170 @@ $packages["bytes"] = (function() {
 		return [line, err];
 	};
 	Buffer.prototype.ReadString = function(delim) { return this.$val.ReadString(delim); };
+	NewBufferString = function(s) {
+		var s;
+		return new Buffer.ptr((new sliceType($stringToBytes(s))), 0, arrayType.zero(), 0);
+	};
+	$pkg.NewBufferString = NewBufferString;
+	countGeneric = function(s, sep) {
+		var i, n, s, sep;
+		if (sep.$length === 0) {
+			return utf8.RuneCount(s) + 1 >> 0;
+		}
+		n = 0;
+		while (true) {
+			i = Index(s, sep);
+			if (i === -1) {
+				return n;
+			}
+			n = n + (1) >> 0;
+			s = $subslice(s, (i + sep.$length >> 0));
+		}
+	};
+	Contains = function(b, subslice) {
+		var b, subslice;
+		return !((Index(b, subslice) === -1));
+	};
+	$pkg.Contains = Contains;
+	Replace = function(s, old, new$1, n) {
+		var _tuple, i, j, m, n, new$1, old, s, start, t, w, wid;
+		m = 0;
+		if (!((n === 0))) {
+			m = Count(s, old);
+		}
+		if (m === 0) {
+			return $appendSlice((sliceType.nil), s);
+		}
+		if (n < 0 || m < n) {
+			n = m;
+		}
+		t = $makeSlice(sliceType, (s.$length + ($imul(n, ((new$1.$length - old.$length >> 0)))) >> 0));
+		w = 0;
+		start = 0;
+		i = 0;
+		while (true) {
+			if (!(i < n)) { break; }
+			j = start;
+			if (old.$length === 0) {
+				if (i > 0) {
+					_tuple = utf8.DecodeRune($subslice(s, start));
+					wid = _tuple[1];
+					j = j + (wid) >> 0;
+				}
+			} else {
+				j = j + (Index($subslice(s, start), old)) >> 0;
+			}
+			w = w + ($copySlice($subslice(t, w), $subslice(s, start, j))) >> 0;
+			w = w + ($copySlice($subslice(t, w), new$1)) >> 0;
+			start = j + old.$length >> 0;
+			i = i + (1) >> 0;
+		}
+		w = w + ($copySlice($subslice(t, w), $subslice(s, start))) >> 0;
+		return $subslice(t, 0, w);
+	};
+	$pkg.Replace = Replace;
+	indexRabinKarp = function(s, sep) {
+		var _tuple, h, hashsep, i, i$1, n, pow, s, sep, x;
+		_tuple = hashStr(sep);
+		hashsep = _tuple[0];
+		pow = _tuple[1];
+		n = sep.$length;
+		h = 0;
+		i = 0;
+		while (true) {
+			if (!(i < n)) { break; }
+			h = ($imul(h, 16777619) >>> 0) + ((((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i]) >>> 0)) >>> 0;
+			i = i + (1) >> 0;
+		}
+		if ((h === hashsep) && Equal($subslice(s, 0, n), sep)) {
+			return 0;
+		}
+		i$1 = n;
+		while (true) {
+			if (!(i$1 < s.$length)) { break; }
+			h = $imul(h, (16777619)) >>> 0;
+			h = h + (((((i$1 < 0 || i$1 >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i$1]) >>> 0))) >>> 0;
+			h = h - (($imul(pow, (((x = i$1 - n >> 0, ((x < 0 || x >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + x])) >>> 0))) >>> 0)) >>> 0;
+			i$1 = i$1 + (1) >> 0;
+			if ((h === hashsep) && Equal($subslice(s, (i$1 - n >> 0), i$1), sep)) {
+				return i$1 - n >> 0;
+			}
+		}
+		return -1;
+	};
+	hashStr = function(sep) {
+		var _tmp, _tmp$1, hash, i, i$1, pow, sep, sq;
+		hash = 0;
+		i = 0;
+		while (true) {
+			if (!(i < sep.$length)) { break; }
+			hash = ($imul(hash, 16777619) >>> 0) + ((((i < 0 || i >= sep.$length) ? ($throwRuntimeError("index out of range"), undefined) : sep.$array[sep.$offset + i]) >>> 0)) >>> 0;
+			i = i + (1) >> 0;
+		}
+		_tmp = 1;
+		_tmp$1 = 16777619;
+		pow = _tmp;
+		sq = _tmp$1;
+		i$1 = sep.$length;
+		while (true) {
+			if (!(i$1 > 0)) { break; }
+			if (!(((i$1 & 1) === 0))) {
+				pow = $imul(pow, (sq)) >>> 0;
+			}
+			sq = $imul(sq, (sq)) >>> 0;
+			i$1 = (i$1 >> $min((1), 31)) >> 0;
+		}
+		return [hash, pow];
+	};
+	Index = function(s, sep) {
+		var c, fails, i, j, n, o, s, sep, t;
+		n = sep.$length;
+		if ((n === 0)) {
+			return 0;
+		} else if ((n === 1)) {
+			return IndexByte(s, (0 >= sep.$length ? ($throwRuntimeError("index out of range"), undefined) : sep.$array[sep.$offset + 0]));
+		} else if ((n === s.$length)) {
+			if (Equal(sep, s)) {
+				return 0;
+			}
+			return -1;
+		} else if (n > s.$length) {
+			return -1;
+		}
+		c = (0 >= sep.$length ? ($throwRuntimeError("index out of range"), undefined) : sep.$array[sep.$offset + 0]);
+		i = 0;
+		fails = 0;
+		t = $subslice(s, 0, ((s.$length - n >> 0) + 1 >> 0));
+		while (true) {
+			if (!(i < t.$length)) { break; }
+			if (!((((i < 0 || i >= t.$length) ? ($throwRuntimeError("index out of range"), undefined) : t.$array[t.$offset + i]) === c))) {
+				o = IndexByte($subslice(t, i), c);
+				if (o < 0) {
+					break;
+				}
+				i = i + (o) >> 0;
+			}
+			if (Equal($subslice(s, i, (i + n >> 0)), sep)) {
+				return i;
+			}
+			i = i + (1) >> 0;
+			fails = fails + (1) >> 0;
+			if (fails >= (4 + (i >> 4 >> 0) >> 0) && i < t.$length) {
+				j = indexRabinKarp($subslice(s, i), sep);
+				if (j < 0) {
+					return -1;
+				}
+				return i + j >> 0;
+			}
+		}
+		return -1;
+	};
+	$pkg.Index = Index;
+	Count = function(s, sep) {
+		var s, sep;
+		return countGeneric(s, sep);
+	};
+	$pkg.Count = Count;
 	ptrType.methods = [{prop: "Bytes", name: "Bytes", pkg: "", typ: $funcType([], [sliceType], false)}, {prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}, {prop: "empty", name: "empty", pkg: "bytes", typ: $funcType([], [$Bool], false)}, {prop: "Len", name: "Len", pkg: "", typ: $funcType([], [$Int], false)}, {prop: "Cap", name: "Cap", pkg: "", typ: $funcType([], [$Int], false)}, {prop: "Truncate", name: "Truncate", pkg: "", typ: $funcType([$Int], [], false)}, {prop: "Reset", name: "Reset", pkg: "", typ: $funcType([], [], false)}, {prop: "tryGrowByReslice", name: "tryGrowByReslice", pkg: "bytes", typ: $funcType([$Int], [$Int, $Bool], false)}, {prop: "grow", name: "grow", pkg: "bytes", typ: $funcType([$Int], [$Int], false)}, {prop: "Grow", name: "Grow", pkg: "", typ: $funcType([$Int], [], false)}, {prop: "Write", name: "Write", pkg: "", typ: $funcType([sliceType], [$Int, $error], false)}, {prop: "WriteString", name: "WriteString", pkg: "", typ: $funcType([$String], [$Int, $error], false)}, {prop: "ReadFrom", name: "ReadFrom", pkg: "", typ: $funcType([io.Reader], [$Int64, $error], false)}, {prop: "WriteTo", name: "WriteTo", pkg: "", typ: $funcType([io.Writer], [$Int64, $error], false)}, {prop: "WriteByte", name: "WriteByte", pkg: "", typ: $funcType([$Uint8], [$error], false)}, {prop: "WriteRune", name: "WriteRune", pkg: "", typ: $funcType([$Int32], [$Int, $error], false)}, {prop: "Read", name: "Read", pkg: "", typ: $funcType([sliceType], [$Int, $error], false)}, {prop: "Next", name: "Next", pkg: "", typ: $funcType([$Int], [sliceType], false)}, {prop: "ReadByte", name: "ReadByte", pkg: "", typ: $funcType([], [$Uint8, $error], false)}, {prop: "ReadRune", name: "ReadRune", pkg: "", typ: $funcType([], [$Int32, $Int, $error], false)}, {prop: "UnreadRune", name: "UnreadRune", pkg: "", typ: $funcType([], [$error], false)}, {prop: "UnreadByte", name: "UnreadByte", pkg: "", typ: $funcType([], [$error], false)}, {prop: "ReadBytes", name: "ReadBytes", pkg: "", typ: $funcType([$Uint8], [sliceType, $error], false)}, {prop: "readSlice", name: "readSlice", pkg: "bytes", typ: $funcType([$Uint8], [sliceType, $error], false)}, {prop: "ReadString", name: "ReadString", pkg: "", typ: $funcType([$Uint8], [$String, $error], false)}];
 	Buffer.init("bytes", [{prop: "buf", name: "buf", anonymous: false, exported: false, typ: sliceType, tag: ""}, {prop: "off", name: "off", anonymous: false, exported: false, typ: $Int, tag: ""}, {prop: "bootstrap", name: "bootstrap", anonymous: false, exported: false, typ: arrayType, tag: ""}, {prop: "lastRead", name: "lastRead", anonymous: false, exported: false, typ: readOp, tag: ""}]);
 	$init = function() {
@@ -23688,17 +24045,30 @@ $packages["sort"] = (function() {
 	return $pkg;
 })();
 $packages["strings"] = (function() {
-	var $pkg = {}, $init, errors, js, io, unicode, utf8, asciiSet, sliceType, sliceType$3, ptrType$6, arrayType$3, IndexByte, Index, LastIndex, Count, explode, Contains, IndexAny, genSplit, Split, Join, HasPrefix, HasSuffix, Map, ToLower, makeASCIISet, TrimPrefix;
+	var $pkg = {}, $init, errors, js, io, unicode, utf8, Reader, asciiSet, sliceType, sliceType$3, ptrType$6, arrayType$3, ptrType$7, IndexByte, Index, LastIndex, Count, NewReader, explode, Contains, IndexRune, IndexAny, genSplit, Split, Join, HasPrefix, HasSuffix, Map, ToLower, TrimLeftFunc, TrimRightFunc, TrimFunc, indexFunc, lastIndexFunc, makeASCIISet, makeCutsetFunc, Trim, TrimLeft, TrimSpace, TrimPrefix, Replace, EqualFold;
 	errors = $packages["errors"];
 	js = $packages["github.com/gopherjs/gopherjs/js"];
 	io = $packages["io"];
 	unicode = $packages["unicode"];
 	utf8 = $packages["unicode/utf8"];
+	Reader = $pkg.Reader = $newType(0, $kindStruct, "strings.Reader", true, "strings", true, function(s_, i_, prevRune_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.s = "";
+			this.i = new $Int64(0, 0);
+			this.prevRune = 0;
+			return;
+		}
+		this.s = s_;
+		this.i = i_;
+		this.prevRune = prevRune_;
+	});
 	asciiSet = $pkg.asciiSet = $newType(32, $kindArray, "strings.asciiSet", true, "strings", false, null);
 	sliceType = $sliceType($Uint8);
 	sliceType$3 = $sliceType($String);
 	ptrType$6 = $ptrType(asciiSet);
 	arrayType$3 = $arrayType($Uint32, 8);
+	ptrType$7 = $ptrType(Reader);
 	IndexByte = function(s, c) {
 		var c, s;
 		return $parseInt(s.indexOf($global.String.fromCharCode(c))) >> 0;
@@ -23738,6 +24108,198 @@ $packages["strings"] = (function() {
 		return n;
 	};
 	$pkg.Count = Count;
+	Reader.ptr.prototype.Len = function() {
+		var r, x, x$1, x$2, x$3, x$4;
+		r = this;
+		if ((x = r.i, x$1 = (new $Int64(0, r.s.length)), (x.$high > x$1.$high || (x.$high === x$1.$high && x.$low >= x$1.$low)))) {
+			return 0;
+		}
+		return (((x$2 = (x$3 = (new $Int64(0, r.s.length)), x$4 = r.i, new $Int64(x$3.$high - x$4.$high, x$3.$low - x$4.$low)), x$2.$low + ((x$2.$high >> 31) * 4294967296)) >> 0));
+	};
+	Reader.prototype.Len = function() { return this.$val.Len(); };
+	Reader.ptr.prototype.Size = function() {
+		var r;
+		r = this;
+		return (new $Int64(0, r.s.length));
+	};
+	Reader.prototype.Size = function() { return this.$val.Size(); };
+	Reader.ptr.prototype.Read = function(b) {
+		var _tmp, _tmp$1, b, err, n, r, x, x$1, x$2, x$3;
+		n = 0;
+		err = $ifaceNil;
+		r = this;
+		if ((x = r.i, x$1 = (new $Int64(0, r.s.length)), (x.$high > x$1.$high || (x.$high === x$1.$high && x.$low >= x$1.$low)))) {
+			_tmp = 0;
+			_tmp$1 = io.EOF;
+			n = _tmp;
+			err = _tmp$1;
+			return [n, err];
+		}
+		r.prevRune = -1;
+		n = $copyString(b, $substring(r.s, $flatten64(r.i)));
+		r.i = (x$2 = r.i, x$3 = (new $Int64(0, n)), new $Int64(x$2.$high + x$3.$high, x$2.$low + x$3.$low));
+		return [n, err];
+	};
+	Reader.prototype.Read = function(b) { return this.$val.Read(b); };
+	Reader.ptr.prototype.ReadAt = function(b, off) {
+		var _tmp, _tmp$1, _tmp$2, _tmp$3, b, err, n, off, r, x;
+		n = 0;
+		err = $ifaceNil;
+		r = this;
+		if ((off.$high < 0 || (off.$high === 0 && off.$low < 0))) {
+			_tmp = 0;
+			_tmp$1 = errors.New("strings.Reader.ReadAt: negative offset");
+			n = _tmp;
+			err = _tmp$1;
+			return [n, err];
+		}
+		if ((x = (new $Int64(0, r.s.length)), (off.$high > x.$high || (off.$high === x.$high && off.$low >= x.$low)))) {
+			_tmp$2 = 0;
+			_tmp$3 = io.EOF;
+			n = _tmp$2;
+			err = _tmp$3;
+			return [n, err];
+		}
+		n = $copyString(b, $substring(r.s, $flatten64(off)));
+		if (n < b.$length) {
+			err = io.EOF;
+		}
+		return [n, err];
+	};
+	Reader.prototype.ReadAt = function(b, off) { return this.$val.ReadAt(b, off); };
+	Reader.ptr.prototype.ReadByte = function() {
+		var b, r, x, x$1, x$2, x$3;
+		r = this;
+		r.prevRune = -1;
+		if ((x = r.i, x$1 = (new $Int64(0, r.s.length)), (x.$high > x$1.$high || (x.$high === x$1.$high && x.$low >= x$1.$low)))) {
+			return [0, io.EOF];
+		}
+		b = r.s.charCodeAt($flatten64(r.i));
+		r.i = (x$2 = r.i, x$3 = new $Int64(0, 1), new $Int64(x$2.$high + x$3.$high, x$2.$low + x$3.$low));
+		return [b, $ifaceNil];
+	};
+	Reader.prototype.ReadByte = function() { return this.$val.ReadByte(); };
+	Reader.ptr.prototype.UnreadByte = function() {
+		var r, x, x$1, x$2;
+		r = this;
+		r.prevRune = -1;
+		if ((x = r.i, (x.$high < 0 || (x.$high === 0 && x.$low <= 0)))) {
+			return errors.New("strings.Reader.UnreadByte: at beginning of string");
+		}
+		r.i = (x$1 = r.i, x$2 = new $Int64(0, 1), new $Int64(x$1.$high - x$2.$high, x$1.$low - x$2.$low));
+		return $ifaceNil;
+	};
+	Reader.prototype.UnreadByte = function() { return this.$val.UnreadByte(); };
+	Reader.ptr.prototype.ReadRune = function() {
+		var _tmp, _tmp$1, _tmp$2, _tmp$3, _tmp$4, _tmp$5, _tuple, c, ch, err, r, size, x, x$1, x$2, x$3, x$4, x$5, x$6;
+		ch = 0;
+		size = 0;
+		err = $ifaceNil;
+		r = this;
+		if ((x = r.i, x$1 = (new $Int64(0, r.s.length)), (x.$high > x$1.$high || (x.$high === x$1.$high && x.$low >= x$1.$low)))) {
+			r.prevRune = -1;
+			_tmp = 0;
+			_tmp$1 = 0;
+			_tmp$2 = io.EOF;
+			ch = _tmp;
+			size = _tmp$1;
+			err = _tmp$2;
+			return [ch, size, err];
+		}
+		r.prevRune = (((x$2 = r.i, x$2.$low + ((x$2.$high >> 31) * 4294967296)) >> 0));
+		c = r.s.charCodeAt($flatten64(r.i));
+		if (c < 128) {
+			r.i = (x$3 = r.i, x$4 = new $Int64(0, 1), new $Int64(x$3.$high + x$4.$high, x$3.$low + x$4.$low));
+			_tmp$3 = ((c >> 0));
+			_tmp$4 = 1;
+			_tmp$5 = $ifaceNil;
+			ch = _tmp$3;
+			size = _tmp$4;
+			err = _tmp$5;
+			return [ch, size, err];
+		}
+		_tuple = utf8.DecodeRuneInString($substring(r.s, $flatten64(r.i)));
+		ch = _tuple[0];
+		size = _tuple[1];
+		r.i = (x$5 = r.i, x$6 = (new $Int64(0, size)), new $Int64(x$5.$high + x$6.$high, x$5.$low + x$6.$low));
+		return [ch, size, err];
+	};
+	Reader.prototype.ReadRune = function() { return this.$val.ReadRune(); };
+	Reader.ptr.prototype.UnreadRune = function() {
+		var r;
+		r = this;
+		if (r.prevRune < 0) {
+			return errors.New("strings.Reader.UnreadRune: previous operation was not ReadRune");
+		}
+		r.i = (new $Int64(0, r.prevRune));
+		r.prevRune = -1;
+		return $ifaceNil;
+	};
+	Reader.prototype.UnreadRune = function() { return this.$val.UnreadRune(); };
+	Reader.ptr.prototype.Seek = function(offset, whence) {
+		var _1, abs, offset, r, whence, x, x$1;
+		r = this;
+		r.prevRune = -1;
+		abs = new $Int64(0, 0);
+		_1 = whence;
+		if (_1 === (0)) {
+			abs = offset;
+		} else if (_1 === (1)) {
+			abs = (x = r.i, new $Int64(x.$high + offset.$high, x.$low + offset.$low));
+		} else if (_1 === (2)) {
+			abs = (x$1 = (new $Int64(0, r.s.length)), new $Int64(x$1.$high + offset.$high, x$1.$low + offset.$low));
+		} else {
+			return [new $Int64(0, 0), errors.New("strings.Reader.Seek: invalid whence")];
+		}
+		if ((abs.$high < 0 || (abs.$high === 0 && abs.$low < 0))) {
+			return [new $Int64(0, 0), errors.New("strings.Reader.Seek: negative position")];
+		}
+		r.i = abs;
+		return [abs, $ifaceNil];
+	};
+	Reader.prototype.Seek = function(offset, whence) { return this.$val.Seek(offset, whence); };
+	Reader.ptr.prototype.WriteTo = function(w) {
+		var _r, _tmp, _tmp$1, _tuple, err, m, n, r, s, w, x, x$1, x$2, x$3, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _tmp = $f._tmp; _tmp$1 = $f._tmp$1; _tuple = $f._tuple; err = $f.err; m = $f.m; n = $f.n; r = $f.r; s = $f.s; w = $f.w; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; x$3 = $f.x$3; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		n = new $Int64(0, 0);
+		err = $ifaceNil;
+		r = this;
+		r.prevRune = -1;
+		if ((x = r.i, x$1 = (new $Int64(0, r.s.length)), (x.$high > x$1.$high || (x.$high === x$1.$high && x.$low >= x$1.$low)))) {
+			_tmp = new $Int64(0, 0);
+			_tmp$1 = $ifaceNil;
+			n = _tmp;
+			err = _tmp$1;
+			$s = -1; return [n, err];
+		}
+		s = $substring(r.s, $flatten64(r.i));
+		_r = io.WriteString(w, s); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_tuple = _r;
+		m = _tuple[0];
+		err = _tuple[1];
+		if (m > s.length) {
+			$panic(new $String("strings.Reader.WriteTo: invalid WriteString count"));
+		}
+		r.i = (x$2 = r.i, x$3 = (new $Int64(0, m)), new $Int64(x$2.$high + x$3.$high, x$2.$low + x$3.$low));
+		n = (new $Int64(0, m));
+		if (!((m === s.length)) && $interfaceIsEqual(err, $ifaceNil)) {
+			err = io.ErrShortWrite;
+		}
+		$s = -1; return [n, err];
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Reader.ptr.prototype.WriteTo }; } $f._r = _r; $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f._tuple = _tuple; $f.err = err; $f.m = m; $f.n = n; $f.r = r; $f.s = s; $f.w = w; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Reader.prototype.WriteTo = function(w) { return this.$val.WriteTo(w); };
+	Reader.ptr.prototype.Reset = function(s) {
+		var r, s;
+		r = this;
+		Reader.copy(r, new Reader.ptr(s, new $Int64(0, 0), -1));
+	};
+	Reader.prototype.Reset = function(s) { return this.$val.Reset(s); };
+	NewReader = function(s) {
+		var s;
+		return new Reader.ptr(s, new $Int64(0, 0), -1);
+	};
+	$pkg.NewReader = NewReader;
 	explode = function(s, n) {
 		var _tuple, a, ch, i, l, n, s, size, x;
 		l = utf8.RuneCountInString(s);
@@ -23768,6 +24330,31 @@ $packages["strings"] = (function() {
 		return Index(s, substr) >= 0;
 	};
 	$pkg.Contains = Contains;
+	IndexRune = function(s, r) {
+		var _i, _ref, _rune, i, r, r$1, s;
+		if (0 <= r && r < 128) {
+			return IndexByte(s, ((r << 24 >>> 24)));
+		} else if ((r === 65533)) {
+			_ref = s;
+			_i = 0;
+			while (true) {
+				if (!(_i < _ref.length)) { break; }
+				_rune = $decodeRune(_ref, _i);
+				i = _i;
+				r$1 = _rune[0];
+				if (r$1 === 65533) {
+					return i;
+				}
+				_i += _rune[1];
+			}
+			return -1;
+		} else if (!utf8.ValidRune(r)) {
+			return -1;
+		} else {
+			return Index(s, ($encodeRune(r)));
+		}
+	};
+	$pkg.IndexRune = IndexRune;
 	IndexAny = function(s, chars) {
 		var _i, _i$1, _ref, _ref$1, _rune, _rune$1, _tuple, as, c, chars, i, i$1, isASCII, m, s;
 		if (chars === "") {
@@ -23996,6 +24583,84 @@ $packages["strings"] = (function() {
 		/* */ } return; } if ($f === undefined) { $f = { $blk: ToLower }; } $f._r = _r; $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f.b = b; $f.c = c; $f.c$1 = c$1; $f.hasUpper = hasUpper; $f.i = i; $f.i$1 = i$1; $f.isASCII = isASCII; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
 	};
 	$pkg.ToLower = ToLower;
+	TrimLeftFunc = function(s, f) {
+		var _r, f, i, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; f = $f.f; i = $f.i; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = indexFunc(s, f, false); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		i = _r;
+		if (i === -1) {
+			$s = -1; return "";
+		}
+		$s = -1; return $substring(s, i);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: TrimLeftFunc }; } $f._r = _r; $f.f = f; $f.i = i; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.TrimLeftFunc = TrimLeftFunc;
+	TrimRightFunc = function(s, f) {
+		var _r, _tuple, f, i, s, wid, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _tuple = $f._tuple; f = $f.f; i = $f.i; s = $f.s; wid = $f.wid; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = lastIndexFunc(s, f, false); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		i = _r;
+		if (i >= 0 && s.charCodeAt(i) >= 128) {
+			_tuple = utf8.DecodeRuneInString($substring(s, i));
+			wid = _tuple[1];
+			i = i + (wid) >> 0;
+		} else {
+			i = i + (1) >> 0;
+		}
+		$s = -1; return $substring(s, 0, i);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: TrimRightFunc }; } $f._r = _r; $f._tuple = _tuple; $f.f = f; $f.i = i; $f.s = s; $f.wid = wid; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.TrimRightFunc = TrimRightFunc;
+	TrimFunc = function(s, f) {
+		var _r, _r$1, f, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; f = $f.f; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = TrimLeftFunc(s, f); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_r$1 = TrimRightFunc(_r, f); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		$s = -1; return _r$1;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: TrimFunc }; } $f._r = _r; $f._r$1 = _r$1; $f.f = f; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.TrimFunc = TrimFunc;
+	indexFunc = function(s, f, truth) {
+		var _i, _r, _ref, _rune, f, i, r, s, truth, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _rune = $f._rune; f = $f.f; i = $f.i; r = $f.r; s = $f.s; truth = $f.truth; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_ref = s;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.length)) { break; } */ if(!(_i < _ref.length)) { $s = 2; continue; }
+			_rune = $decodeRune(_ref, _i);
+			i = _i;
+			r = _rune[0];
+			_r = f(r); /* */ $s = 5; case 5: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			/* */ if (_r === truth) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (_r === truth) { */ case 3:
+				$s = -1; return i;
+			/* } */ case 4:
+			_i += _rune[1];
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return -1;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: indexFunc }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._rune = _rune; $f.f = f; $f.i = i; $f.r = r; $f.s = s; $f.truth = truth; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	lastIndexFunc = function(s, f, truth) {
+		var _r, _tuple, f, i, r, s, size, truth, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _tuple = $f._tuple; f = $f.f; i = $f.i; r = $f.r; s = $f.s; size = $f.size; truth = $f.truth; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		i = s.length;
+		/* while (true) { */ case 1:
+			/* if (!(i > 0)) { break; } */ if(!(i > 0)) { $s = 2; continue; }
+			_tuple = utf8.DecodeLastRuneInString($substring(s, 0, i));
+			r = _tuple[0];
+			size = _tuple[1];
+			i = i - (size) >> 0;
+			_r = f(r); /* */ $s = 5; case 5: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			/* */ if (_r === truth) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (_r === truth) { */ case 3:
+				$s = -1; return i;
+			/* } */ case 4:
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return -1;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: lastIndexFunc }; } $f._r = _r; $f._tuple = _tuple; $f.f = f; $f.i = i; $f.r = r; $f.s = s; $f.size = size; $f.truth = truth; $f.$s = $s; $f.$r = $r; return $f;
+	};
 	makeASCIISet = function(chars) {
 		var _index, _tmp, _tmp$1, _tmp$2, _tmp$3, as, c, chars, i, ok, y;
 		as = arrayType$3.zero();
@@ -24027,6 +24692,58 @@ $packages["strings"] = (function() {
 		return !((((((x = c >>> 5 << 24 >>> 24, (as.nilCheck, ((x < 0 || x >= as.length) ? ($throwRuntimeError("index out of range"), undefined) : as[x]))) & (((y = ((((c & 31) >>> 0) >>> 0)), y < 32 ? (1 << y) : 0) >>> 0))) >>> 0)) === 0));
 	};
 	$ptrType(asciiSet).prototype.contains = function(c) { return (new asciiSet(this.$get())).contains(c); };
+	makeCutsetFunc = function(cutset) {
+		var _tuple, as, cutset, isASCII;
+		if ((cutset.length === 1) && cutset.charCodeAt(0) < 128) {
+			return (function(r) {
+				var r;
+				return r === ((cutset.charCodeAt(0) >> 0));
+			});
+		}
+		_tuple = makeASCIISet(cutset);
+		as = $clone(_tuple[0], asciiSet);
+		isASCII = _tuple[1];
+		if (isASCII) {
+			return (function(r) {
+				var r;
+				return r < 128 && new ptrType$6(as).contains(((r << 24 >>> 24)));
+			});
+		}
+		return (function(r) {
+			var r;
+			return IndexRune(cutset, r) >= 0;
+		});
+	};
+	Trim = function(s, cutset) {
+		var _r, cutset, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; cutset = $f.cutset; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (s === "" || cutset === "") {
+			$s = -1; return s;
+		}
+		_r = TrimFunc(s, makeCutsetFunc(cutset)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Trim }; } $f._r = _r; $f.cutset = cutset; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Trim = Trim;
+	TrimLeft = function(s, cutset) {
+		var _r, cutset, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; cutset = $f.cutset; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (s === "" || cutset === "") {
+			$s = -1; return s;
+		}
+		_r = TrimLeftFunc(s, makeCutsetFunc(cutset)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: TrimLeft }; } $f._r = _r; $f.cutset = cutset; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.TrimLeft = TrimLeft;
+	TrimSpace = function(s) {
+		var _r, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = TrimFunc(s, unicode.IsSpace); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: TrimSpace }; } $f._r = _r; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.TrimSpace = TrimSpace;
 	TrimPrefix = function(s, prefix) {
 		var prefix, s;
 		if (HasPrefix(s, prefix)) {
@@ -24035,7 +24752,109 @@ $packages["strings"] = (function() {
 		return s;
 	};
 	$pkg.TrimPrefix = TrimPrefix;
+	Replace = function(s, old, new$1, n) {
+		var _tuple, i, j, m, n, new$1, old, s, start, t, w, wid;
+		if (old === new$1 || (n === 0)) {
+			return s;
+		}
+		m = Count(s, old);
+		if (m === 0) {
+			return s;
+		} else if (n < 0 || m < n) {
+			n = m;
+		}
+		t = $makeSlice(sliceType, (s.length + ($imul(n, ((new$1.length - old.length >> 0)))) >> 0));
+		w = 0;
+		start = 0;
+		i = 0;
+		while (true) {
+			if (!(i < n)) { break; }
+			j = start;
+			if (old.length === 0) {
+				if (i > 0) {
+					_tuple = utf8.DecodeRuneInString($substring(s, start));
+					wid = _tuple[1];
+					j = j + (wid) >> 0;
+				}
+			} else {
+				j = j + (Index($substring(s, start), old)) >> 0;
+			}
+			w = w + ($copyString($subslice(t, w), $substring(s, start, j))) >> 0;
+			w = w + ($copyString($subslice(t, w), new$1)) >> 0;
+			start = j + old.length >> 0;
+			i = i + (1) >> 0;
+		}
+		w = w + ($copyString($subslice(t, w), $substring(s, start))) >> 0;
+		return ($bytesToString($subslice(t, 0, w)));
+	};
+	$pkg.Replace = Replace;
+	EqualFold = function(s, t) {
+		var _tmp, _tmp$1, _tmp$10, _tmp$11, _tmp$2, _tmp$3, _tmp$4, _tmp$5, _tmp$6, _tmp$7, _tmp$8, _tmp$9, _tuple, _tuple$1, r, r$1, r$2, s, size, size$1, sr, t, tr;
+		while (true) {
+			if (!(!(s === "") && !(t === ""))) { break; }
+			_tmp = 0;
+			_tmp$1 = 0;
+			sr = _tmp;
+			tr = _tmp$1;
+			if (s.charCodeAt(0) < 128) {
+				_tmp$2 = ((s.charCodeAt(0) >> 0));
+				_tmp$3 = $substring(s, 1);
+				sr = _tmp$2;
+				s = _tmp$3;
+			} else {
+				_tuple = utf8.DecodeRuneInString(s);
+				r = _tuple[0];
+				size = _tuple[1];
+				_tmp$4 = r;
+				_tmp$5 = $substring(s, size);
+				sr = _tmp$4;
+				s = _tmp$5;
+			}
+			if (t.charCodeAt(0) < 128) {
+				_tmp$6 = ((t.charCodeAt(0) >> 0));
+				_tmp$7 = $substring(t, 1);
+				tr = _tmp$6;
+				t = _tmp$7;
+			} else {
+				_tuple$1 = utf8.DecodeRuneInString(t);
+				r$1 = _tuple$1[0];
+				size$1 = _tuple$1[1];
+				_tmp$8 = r$1;
+				_tmp$9 = $substring(t, size$1);
+				tr = _tmp$8;
+				t = _tmp$9;
+			}
+			if (tr === sr) {
+				continue;
+			}
+			if (tr < sr) {
+				_tmp$10 = sr;
+				_tmp$11 = tr;
+				tr = _tmp$10;
+				sr = _tmp$11;
+			}
+			if (tr < 128 && 65 <= sr && sr <= 90) {
+				if (tr === ((sr + 97 >> 0) - 65 >> 0)) {
+					continue;
+				}
+				return false;
+			}
+			r$2 = unicode.SimpleFold(sr);
+			while (true) {
+				if (!(!((r$2 === sr)) && r$2 < tr)) { break; }
+				r$2 = unicode.SimpleFold(r$2);
+			}
+			if (r$2 === tr) {
+				continue;
+			}
+			return false;
+		}
+		return s === t;
+	};
+	$pkg.EqualFold = EqualFold;
+	ptrType$7.methods = [{prop: "Len", name: "Len", pkg: "", typ: $funcType([], [$Int], false)}, {prop: "Size", name: "Size", pkg: "", typ: $funcType([], [$Int64], false)}, {prop: "Read", name: "Read", pkg: "", typ: $funcType([sliceType], [$Int, $error], false)}, {prop: "ReadAt", name: "ReadAt", pkg: "", typ: $funcType([sliceType, $Int64], [$Int, $error], false)}, {prop: "ReadByte", name: "ReadByte", pkg: "", typ: $funcType([], [$Uint8, $error], false)}, {prop: "UnreadByte", name: "UnreadByte", pkg: "", typ: $funcType([], [$error], false)}, {prop: "ReadRune", name: "ReadRune", pkg: "", typ: $funcType([], [$Int32, $Int, $error], false)}, {prop: "UnreadRune", name: "UnreadRune", pkg: "", typ: $funcType([], [$error], false)}, {prop: "Seek", name: "Seek", pkg: "", typ: $funcType([$Int64, $Int], [$Int64, $error], false)}, {prop: "WriteTo", name: "WriteTo", pkg: "", typ: $funcType([io.Writer], [$Int64, $error], false)}, {prop: "Reset", name: "Reset", pkg: "", typ: $funcType([$String], [], false)}];
 	ptrType$6.methods = [{prop: "contains", name: "contains", pkg: "strings", typ: $funcType([$Uint8], [$Bool], false)}];
+	Reader.init("strings", [{prop: "s", name: "s", anonymous: false, exported: false, typ: $String, tag: ""}, {prop: "i", name: "i", anonymous: false, exported: false, typ: $Int64, tag: ""}, {prop: "prevRune", name: "prevRune", anonymous: false, exported: false, typ: $Int, tag: ""}]);
 	asciiSet.init($Uint32, 8);
 	$init = function() {
 		$pkg.$init = function() {};
@@ -25346,14 +26165,5230 @@ $packages["github.com/funnelorg/funnel/math"] = (function() {
 	$pkg.$init = $init;
 	return $pkg;
 })();
+$packages["bufio"] = (function() {
+	var $pkg = {}, $init, bytes, errors, io, utf8, errNegativeRead, errNegativeWrite;
+	bytes = $packages["bytes"];
+	errors = $packages["errors"];
+	io = $packages["io"];
+	utf8 = $packages["unicode/utf8"];
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = bytes.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = errors.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = io.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = utf8.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.ErrInvalidUnreadByte = errors.New("bufio: invalid use of UnreadByte");
+		$pkg.ErrInvalidUnreadRune = errors.New("bufio: invalid use of UnreadRune");
+		$pkg.ErrBufferFull = errors.New("bufio: buffer full");
+		$pkg.ErrNegativeCount = errors.New("bufio: negative count");
+		errNegativeRead = errors.New("bufio: reader returned negative count from Read");
+		errNegativeWrite = errors.New("bufio: writer returned negative count from Write");
+		$pkg.ErrTooLong = errors.New("bufio.Scanner: token too long");
+		$pkg.ErrNegativeAdvance = errors.New("bufio.Scanner: SplitFunc returns negative advance count");
+		$pkg.ErrAdvanceTooFar = errors.New("bufio.Scanner: SplitFunc returns advance count beyond input");
+		$pkg.ErrFinalToken = errors.New("final token");
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["golang.org/x/net/html/atom"] = (function() {
+	var $pkg = {}, $init, Atom, table, fnv, match, Lookup, String;
+	Atom = $pkg.Atom = $newType(4, $kindUint32, "atom.Atom", true, "golang.org/x/net/html/atom", true, null);
+	Atom.prototype.String = function() {
+		var a, n, start;
+		a = this.$val;
+		start = (((a >>> 8 >>> 0) >>> 0));
+		n = ((((a & 255) >>> 0) >>> 0));
+		if ((start + n >>> 0) > 1834) {
+			return "";
+		}
+		return $substring("abbradiogrouparamainavalueaccept-charsetbodyaccesskeygenobrbasefontimeupdateviacacheightmlabelooptgroupatternoembedetailsampictureversedfnoframesetdirnameterowspanomoduleacronymalignmarkbdialogallowpaymentrequestrikeytypeallowusermediagroupingaltfooterubyasyncanvasidefaultitleaudioncancelautofocusandboxmplaceholderautoplaysinlinebdoncanplaythrough1bgsoundisabledivarbigblinkindraggablegendblockquotebuttonabortcitempropenoncecolgrouplaintextrackcolorcolspannotation-xmlcommandcontrolshapecoordslotranslatecrossoriginsmallowfullscreenoscriptfacenterfieldsetfigcaptionafterprintegrityfigurequiredforeignObjectforeignobjectformactionautocompleteerrorformenctypemustmatchallengeformmethodformnovalidatetimeformtargethgrouposterhiddenhigh2hreflanghttp-equivideonclickiframeimageimglyph3isindexismappletitemtypemarqueematheadersortedmaxlength4minlength5mtextareadonlymultiplemutedoncloseamlessourceoncontextmenuitemidoncopyoncuechangeoncutondblclickondragendondragenterondragexitemreferrerpolicyondragleaveondragoverondragstarticleondropzonemptiedondurationchangeonendedonerroronfocuspaceronhashchangeoninputmodeloninvalidonkeydownloadonkeypresspellcheckedonkeyupreloadonlanguagechangeonloadeddatalistingonloadedmetadatabindexonloadendonloadstartonmessageerroronmousedownonmouseenteronmouseleaveonmousemoveonmouseoutputonmouseoveronmouseupromptonmousewheelonofflineononlineonpagehidesclassectionbluronpageshowbronpastepublicontenteditableonpausemaponplayingonpopstateonprogressrcdocodeferonratechangeonrejectionhandledonresetonresizesrclangonscrollonsecuritypolicyviolationauxclickonseekedonseekingonselectedonshowidth6onsortableonstalledonstorageonsubmitemscopedonsuspendontoggleonunhandledrejectionbeforeprintonunloadonvolumechangeonwaitingonwheeloptimumanifestrongoptionbeforeunloaddressrcsetstylesummarysupsvgsystemplateworkertypewrap", start, (start + n >>> 0));
+	};
+	$ptrType(Atom).prototype.String = function() { return new Atom(this.$get()).String(); };
+	Atom.prototype.string = function() {
+		var a;
+		a = this.$val;
+		return $substring("abbradiogrouparamainavalueaccept-charsetbodyaccesskeygenobrbasefontimeupdateviacacheightmlabelooptgroupatternoembedetailsampictureversedfnoframesetdirnameterowspanomoduleacronymalignmarkbdialogallowpaymentrequestrikeytypeallowusermediagroupingaltfooterubyasyncanvasidefaultitleaudioncancelautofocusandboxmplaceholderautoplaysinlinebdoncanplaythrough1bgsoundisabledivarbigblinkindraggablegendblockquotebuttonabortcitempropenoncecolgrouplaintextrackcolorcolspannotation-xmlcommandcontrolshapecoordslotranslatecrossoriginsmallowfullscreenoscriptfacenterfieldsetfigcaptionafterprintegrityfigurequiredforeignObjectforeignobjectformactionautocompleteerrorformenctypemustmatchallengeformmethodformnovalidatetimeformtargethgrouposterhiddenhigh2hreflanghttp-equivideonclickiframeimageimglyph3isindexismappletitemtypemarqueematheadersortedmaxlength4minlength5mtextareadonlymultiplemutedoncloseamlessourceoncontextmenuitemidoncopyoncuechangeoncutondblclickondragendondragenterondragexitemreferrerpolicyondragleaveondragoverondragstarticleondropzonemptiedondurationchangeonendedonerroronfocuspaceronhashchangeoninputmodeloninvalidonkeydownloadonkeypresspellcheckedonkeyupreloadonlanguagechangeonloadeddatalistingonloadedmetadatabindexonloadendonloadstartonmessageerroronmousedownonmouseenteronmouseleaveonmousemoveonmouseoutputonmouseoveronmouseupromptonmousewheelonofflineononlineonpagehidesclassectionbluronpageshowbronpastepublicontenteditableonpausemaponplayingonpopstateonprogressrcdocodeferonratechangeonrejectionhandledonresetonresizesrclangonscrollonsecuritypolicyviolationauxclickonseekedonseekingonselectedonshowidth6onsortableonstalledonstorageonsubmitemscopedonsuspendontoggleonunhandledrejectionbeforeprintonunloadonvolumechangeonwaitingonwheeloptimumanifestrongoptionbeforeunloaddressrcsetstylesummarysupsvgsystemplateworkertypewrap", (a >>> 8 >>> 0), ((a >>> 8 >>> 0) + ((a & 255) >>> 0) >>> 0));
+	};
+	$ptrType(Atom).prototype.string = function() { return new Atom(this.$get()).string(); };
+	fnv = function(h, s) {
+		var _i, _ref, h, i, s;
+		_ref = s;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			h = (h ^ (((((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i]) >>> 0)))) >>> 0;
+			h = $imul(h, (16777619)) >>> 0;
+			_i++;
+		}
+		return h;
+	};
+	match = function(s, t) {
+		var _i, _ref, c, i, s, t;
+		_ref = t;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			c = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (!((s.charCodeAt(i) === c))) {
+				return false;
+			}
+			_i++;
+		}
+		return true;
+	};
+	Lookup = function(s) {
+		var a, a$1, h, s, x, x$1;
+		if ((s.$length === 0) || s.$length > 25) {
+			return 0;
+		}
+		h = fnv(2177757454, s);
+		a = (x = (h & 511) >>> 0, ((x < 0 || x >= table.length) ? ($throwRuntimeError("index out of range"), undefined) : table[x]));
+		if ((((((a & 255) >>> 0) >> 0)) === s.$length) && match(new Atom(a).string(), s)) {
+			return a;
+		}
+		a$1 = (x$1 = (((h >>> 16 >>> 0)) & 511) >>> 0, ((x$1 < 0 || x$1 >= table.length) ? ($throwRuntimeError("index out of range"), undefined) : table[x$1]));
+		if ((((((a$1 & 255) >>> 0) >> 0)) === s.$length) && match(new Atom(a$1).string(), s)) {
+			return a$1;
+		}
+		return 0;
+	};
+	$pkg.Lookup = Lookup;
+	String = function(s) {
+		var a, s;
+		a = Lookup(s);
+		if (!((a === 0))) {
+			return new Atom(a).String();
+		}
+		return ($bytesToString(s));
+	};
+	$pkg.String = String;
+	Atom.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}, {prop: "string", name: "string", pkg: "golang.org/x/net/html/atom", typ: $funcType([], [$String], false)}];
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		table = $toNativeArray($kindUint32, [0, 58890, 189444, 0, 11273, 35592, 0, 408072, 463110, 0, 411909, 0, 166155, 79618, 235275, 0, 84739, 70917, 96777, 0, 192773, 176386, 231172, 184070, 0, 62982, 174086, 178184, 103687, 17934, 65285, 302342, 0, 71944, 403720, 197125, 382994, 0, 95236, 335110, 209156, 327436, 360199, 369673, 115719, 0, 0, 114437, 390404, 190474, 0, 1537, 350474, 429076, 0, 272903, 0, 0, 15112, 0, 0, 0, 0, 4867, 96004, 218888, 198662, 0, 45570, 0, 185606, 462339, 361220, 147209, 361990, 0, 109315, 100106, 216834, 0, 375048, 390405, 214274, 0, 0, 0, 208901, 54791, 374538, 281353, 241929, 0, 0, 238085, 276230, 109320, 0, 0, 91394, 0, 0, 15362, 346121, 210694, 0, 298256, 0, 0, 277772, 38404, 62725, 352516, 212227, 0, 125446, 199938, 452366, 39940, 408582, 38917, 232198, 343052, 376838, 0, 0, 113157, 0, 204552, 0, 0, 41986, 269064, 209159, 379916, 395289, 0, 304392, 321547, 126724, 307216, 6662, 157702, 0, 0, 0, 439054, 8455, 161299, 49427, 10244, 68103, 408584, 138756, 124165, 0, 427016, 0, 0, 412418, 46596, 0, 2817, 0, 0, 437000, 23812, 91144, 0, 0, 0, 271111, 45066, 0, 424713, 217349, 413446, 105736, 0, 0, 422153, 94981, 0, 241926, 42754, 159236, 76039, 35589, 5381, 418313, 0, 0, 43527, 104962, 0, 514, 140808, 167949, 41480, 27655, 433677, 102662, 193799, 459783, 0, 0, 64260, 353285, 259083, 143623, 0, 0, 0, 56590, 315147, 0, 0, 0, 92931, 305412, 208388, 281349, 0, 0, 256522, 187906, 0, 111113, 0, 324364, 0, 0, 293127, 290819, 0, 220936, 47619, 212233, 52993, 401162, 0, 359427, 0, 15108, 451334, 0, 267024, 0, 35080, 0, 263432, 0, 423173, 32776, 244235, 260613, 77571, 391431, 198403, 0, 0, 257, 152579, 67333, 280839, 218628, 173066, 468484, 0, 146434, 289546, 26626, 0, 214786, 222981, 62211, 378116, 28162, 247050, 0, 40708, 0, 448264, 231176, 363271, 0, 442633, 0, 312841, 0, 228877, 0, 355590, 261127, 37635, 61188, 150536, 283913, 45317, 0, 363012, 412930, 115716, 142858, 286217, 420616, 85257, 461571, 3073, 0, 264713, 233734, 105476, 239370, 0, 330507, 0, 421123, 296707, 24328, 0, 0, 0, 39943, 227334, 136712, 107268, 132099, 152589, 371978, 0, 167175, 161294, 217608, 0, 161804, 87810, 122376, 67842, 0, 144908, 0, 155917, 206599, 367111, 386562, 20998, 214787, 37639, 127497, 22020, 214793, 296455, 463880, 253707, 14850, 0, 376835, 449798, 0, 30724, 455431, 348424, 0, 78091, 181254, 132613, 444935, 117002, 291850, 29191, 66310, 73993, 3077, 0, 287496, 283139, 224263, 47363, 203014, 188420, 389384, 0, 302348, 0, 52226, 180234, 69637, 458501, 53766, 368134, 195590, 4100, 0, 31495, 0, 0, 202245, 0, 304388, 22789, 0, 250126, 87554, 0, 341510, 354311, 0, 446727, 187140, 89090, 416009, 93443, 16900, 0, 422914, 209158, 317961, 108037, 159242, 139270, 14084, 365829, 305415, 98566, 0, 170761, 149510, 58885, 0, 0, 55556, 16132, 317966, 225544, 34563, 378629, 49923, 104963, 336651, 176650, 465930, 0, 249095, 0, 0, 1, 202755, 16396, 89607, 12806, 9989, 0, 0, 410630, 0, 9473, 26119, 0, 0, 0, 85264, 0, 186114, 456966, 94211, 0, 413960, 294919, 0, 369670, 0, 309252, 262918, 0, 393224, 129803, 357130, 4, 37378, 363279, 160262, 81931, 274695, 188424, 0, 333322, 387591, 80904, 405769, 0, 423174, 0, 778, 0, 229387, 339465, 0, 182790, 133135, 310792, 0, 0, 200455, 6670, 175630, 0, 0, 117006, 28165, 137222, 47878, 120583]);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["golang.org/x/net/html"] = (function() {
+	var $pkg = {}, $init, bufio, bytes, errors, fmt, atom, io, strconv, strings, utf8, NodeType, Node, nodeStack, insertionModeStack, parser, scope, insertionMode, TokenType, Attribute, Token, span, Tokenizer, sliceType, ptrType, sliceType$1, sliceType$2, sliceType$3, arrayType, arrayType$1, ptrType$1, ptrType$2, ptrType$3, arrayType$2, arrayType$3, sliceType$6, ptrType$4, isSpecialElementMap, quirkyIDs, entity, entity2, replacementTable, breakout, svgTagNameAdjustments, mathMLAttributeAdjustments, svgAttributeAdjustments, scopeMarker, scopeMarker$24ptr, defaultScopeStopTags, plaintextAbort, nul, replacement, isSpecialElement, parseDoctype, unescapeEntity, unescape, lower, escape, EscapeString, adjustAttributeNames, adjustForeignAttributes, htmlIntegrationPoint, mathMLTextIntegrationPoint, reparentChildren, initialIM, beforeHTMLIM, beforeHeadIM, inHeadIM, afterHeadIM, copyAttributes, inBodyIM, textIM, inTableIM, inCaptionIM, inColumnGroupIM, inTableBodyIM, inRowIM, inCellIM, inSelectIM, inSelectInTableIM, inTemplateIM, afterBodyIM, inFramesetIM, afterFramesetIM, afterAfterBodyIM, afterAfterFramesetIM, parseForeignContent, Parse, readAtLeastOneByte, convertNewlines, NewTokenizer, NewTokenizerFragment;
+	bufio = $packages["bufio"];
+	bytes = $packages["bytes"];
+	errors = $packages["errors"];
+	fmt = $packages["fmt"];
+	atom = $packages["golang.org/x/net/html/atom"];
+	io = $packages["io"];
+	strconv = $packages["strconv"];
+	strings = $packages["strings"];
+	utf8 = $packages["unicode/utf8"];
+	NodeType = $pkg.NodeType = $newType(4, $kindUint32, "html.NodeType", true, "golang.org/x/net/html", true, null);
+	Node = $pkg.Node = $newType(0, $kindStruct, "html.Node", true, "golang.org/x/net/html", true, function(Parent_, FirstChild_, LastChild_, PrevSibling_, NextSibling_, Type_, DataAtom_, Data_, Namespace_, Attr_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Parent = ptrType.nil;
+			this.FirstChild = ptrType.nil;
+			this.LastChild = ptrType.nil;
+			this.PrevSibling = ptrType.nil;
+			this.NextSibling = ptrType.nil;
+			this.Type = 0;
+			this.DataAtom = 0;
+			this.Data = "";
+			this.Namespace = "";
+			this.Attr = sliceType$1.nil;
+			return;
+		}
+		this.Parent = Parent_;
+		this.FirstChild = FirstChild_;
+		this.LastChild = LastChild_;
+		this.PrevSibling = PrevSibling_;
+		this.NextSibling = NextSibling_;
+		this.Type = Type_;
+		this.DataAtom = DataAtom_;
+		this.Data = Data_;
+		this.Namespace = Namespace_;
+		this.Attr = Attr_;
+	});
+	nodeStack = $pkg.nodeStack = $newType(12, $kindSlice, "html.nodeStack", true, "golang.org/x/net/html", false, null);
+	insertionModeStack = $pkg.insertionModeStack = $newType(12, $kindSlice, "html.insertionModeStack", true, "golang.org/x/net/html", false, null);
+	parser = $pkg.parser = $newType(0, $kindStruct, "html.parser", true, "golang.org/x/net/html", false, function(tokenizer_, tok_, hasSelfClosingToken_, doc_, oe_, afe_, head_, form_, scripting_, framesetOK_, templateStack_, im_, originalIM_, fosterParenting_, quirks_, fragment_, context_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.tokenizer = ptrType$3.nil;
+			this.tok = new Token.ptr(0, 0, "", sliceType$1.nil);
+			this.hasSelfClosingToken = false;
+			this.doc = ptrType.nil;
+			this.oe = nodeStack.nil;
+			this.afe = nodeStack.nil;
+			this.head = ptrType.nil;
+			this.form = ptrType.nil;
+			this.scripting = false;
+			this.framesetOK = false;
+			this.templateStack = insertionModeStack.nil;
+			this.im = $throwNilPointerError;
+			this.originalIM = $throwNilPointerError;
+			this.fosterParenting = false;
+			this.quirks = false;
+			this.fragment = false;
+			this.context = ptrType.nil;
+			return;
+		}
+		this.tokenizer = tokenizer_;
+		this.tok = tok_;
+		this.hasSelfClosingToken = hasSelfClosingToken_;
+		this.doc = doc_;
+		this.oe = oe_;
+		this.afe = afe_;
+		this.head = head_;
+		this.form = form_;
+		this.scripting = scripting_;
+		this.framesetOK = framesetOK_;
+		this.templateStack = templateStack_;
+		this.im = im_;
+		this.originalIM = originalIM_;
+		this.fosterParenting = fosterParenting_;
+		this.quirks = quirks_;
+		this.fragment = fragment_;
+		this.context = context_;
+	});
+	scope = $pkg.scope = $newType(4, $kindInt, "html.scope", true, "golang.org/x/net/html", false, null);
+	insertionMode = $pkg.insertionMode = $newType(4, $kindFunc, "html.insertionMode", true, "golang.org/x/net/html", false, null);
+	TokenType = $pkg.TokenType = $newType(4, $kindUint32, "html.TokenType", true, "golang.org/x/net/html", true, null);
+	Attribute = $pkg.Attribute = $newType(0, $kindStruct, "html.Attribute", true, "golang.org/x/net/html", true, function(Namespace_, Key_, Val_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Namespace = "";
+			this.Key = "";
+			this.Val = "";
+			return;
+		}
+		this.Namespace = Namespace_;
+		this.Key = Key_;
+		this.Val = Val_;
+	});
+	Token = $pkg.Token = $newType(0, $kindStruct, "html.Token", true, "golang.org/x/net/html", true, function(Type_, DataAtom_, Data_, Attr_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Type = 0;
+			this.DataAtom = 0;
+			this.Data = "";
+			this.Attr = sliceType$1.nil;
+			return;
+		}
+		this.Type = Type_;
+		this.DataAtom = DataAtom_;
+		this.Data = Data_;
+		this.Attr = Attr_;
+	});
+	span = $pkg.span = $newType(0, $kindStruct, "html.span", true, "golang.org/x/net/html", false, function(start_, end_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.start = 0;
+			this.end = 0;
+			return;
+		}
+		this.start = start_;
+		this.end = end_;
+	});
+	Tokenizer = $pkg.Tokenizer = $newType(0, $kindStruct, "html.Tokenizer", true, "golang.org/x/net/html", true, function(r_, tt_, err_, readErr_, raw_, buf_, maxBuf_, data_, pendingAttr_, attr_, nAttrReturned_, rawTag_, textIsRaw_, convertNUL_, allowCDATA_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.r = $ifaceNil;
+			this.tt = 0;
+			this.err = $ifaceNil;
+			this.readErr = $ifaceNil;
+			this.raw = new span.ptr(0, 0);
+			this.buf = sliceType$3.nil;
+			this.maxBuf = 0;
+			this.data = new span.ptr(0, 0);
+			this.pendingAttr = arrayType$3.zero();
+			this.attr = sliceType$6.nil;
+			this.nAttrReturned = 0;
+			this.rawTag = "";
+			this.textIsRaw = false;
+			this.convertNUL = false;
+			this.allowCDATA = false;
+			return;
+		}
+		this.r = r_;
+		this.tt = tt_;
+		this.err = err_;
+		this.readErr = readErr_;
+		this.raw = raw_;
+		this.buf = buf_;
+		this.maxBuf = maxBuf_;
+		this.data = data_;
+		this.pendingAttr = pendingAttr_;
+		this.attr = attr_;
+		this.nAttrReturned = nAttrReturned_;
+		this.rawTag = rawTag_;
+		this.textIsRaw = textIsRaw_;
+		this.convertNUL = convertNUL_;
+		this.allowCDATA = allowCDATA_;
+	});
+	sliceType = $sliceType($String);
+	ptrType = $ptrType(Node);
+	sliceType$1 = $sliceType(Attribute);
+	sliceType$2 = $sliceType(atom.Atom);
+	sliceType$3 = $sliceType($Uint8);
+	arrayType = $arrayType($Int32, 2);
+	arrayType$1 = $arrayType($Uint8, 64);
+	ptrType$1 = $ptrType(nodeStack);
+	ptrType$2 = $ptrType(insertionModeStack);
+	ptrType$3 = $ptrType(Tokenizer);
+	arrayType$2 = $arrayType($Uint8, 2);
+	arrayType$3 = $arrayType(span, 2);
+	sliceType$6 = $sliceType(arrayType$3);
+	ptrType$4 = $ptrType(parser);
+	isSpecialElement = function(element) {
+		var _1, _entry, element;
+		_1 = element.Namespace;
+		if (_1 === ("") || _1 === ("html")) {
+			return (_entry = isSpecialElementMap[$String.keyFor(element.Data)], _entry !== undefined ? _entry.v : false);
+		} else if (_1 === ("svg")) {
+			return element.Data === "foreignObject";
+		}
+		return false;
+	};
+	parseDoctype = function(s) {
+		var _1, _i, _r, _r$1, _r$2, _r$3, _r$4, _r$5, _ref, _tmp, _tmp$1, _tmp$2, _tmp$3, _v, id, key, lastAttr, n, public$1, q, q$1, quirks, quote, s, space, x, x$1, x$2, x$3, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _r$4 = $f._r$4; _r$5 = $f._r$5; _ref = $f._ref; _tmp = $f._tmp; _tmp$1 = $f._tmp$1; _tmp$2 = $f._tmp$2; _tmp$3 = $f._tmp$3; _v = $f._v; id = $f.id; key = $f.key; lastAttr = $f.lastAttr; n = $f.n; public$1 = $f.public$1; q = $f.q; q$1 = $f.q$1; quirks = $f.quirks; quote = $f.quote; s = $f.s; space = $f.space; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; x$3 = $f.x$3; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		n = ptrType.nil;
+		quirks = false;
+		n = new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 5, 0, "", "", sliceType$1.nil);
+		space = strings.IndexAny(s, " \t\r\n\f");
+		if (space === -1) {
+			space = s.length;
+		}
+		n.Data = $substring(s, 0, space);
+		if (!(n.Data === "html")) {
+			quirks = true;
+		}
+		_r = strings.ToLower(n.Data); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		n.Data = _r;
+		_r$1 = strings.TrimLeft($substring(s, space), " \t\r\n\f"); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		s = _r$1;
+		if (s.length < 6) {
+			_tmp = n;
+			_tmp$1 = quirks || !(s === "");
+			n = _tmp;
+			quirks = _tmp$1;
+			$s = -1; return [n, quirks];
+		}
+		_r$2 = strings.ToLower($substring(s, 0, 6)); /* */ $s = 3; case 3: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+		key = _r$2;
+		s = $substring(s, 6);
+		/* while (true) { */ case 4:
+			/* if (!(key === "public" || key === "system")) { break; } */ if(!(key === "public" || key === "system")) { $s = 5; continue; }
+			_r$3 = strings.TrimLeft(s, " \t\r\n\f"); /* */ $s = 6; case 6: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+			s = _r$3;
+			if (s === "") {
+				/* break; */ $s = 5; continue;
+			}
+			quote = s.charCodeAt(0);
+			if (!((quote === 34)) && !((quote === 39))) {
+				/* break; */ $s = 5; continue;
+			}
+			s = $substring(s, 1);
+			q = strings.IndexRune(s, ((quote >> 0)));
+			id = "";
+			if (q === -1) {
+				id = s;
+				s = "";
+			} else {
+				id = $substring(s, 0, q);
+				s = $substring(s, (q + 1 >> 0));
+			}
+			n.Attr = $append(n.Attr, new Attribute.ptr("", key, id));
+			if (key === "public") {
+				key = "system";
+			} else {
+				key = "";
+			}
+		/* } */ $s = 4; continue; case 5:
+		/* */ if (!(key === "") || !(s === "")) { $s = 7; continue; }
+		/* */ if (n.Attr.$length > 0) { $s = 8; continue; }
+		/* */ $s = 9; continue;
+		/* if (!(key === "") || !(s === "")) { */ case 7:
+			quirks = true;
+			$s = 9; continue;
+		/* } else if (n.Attr.$length > 0) { */ case 8:
+			/* */ if ((x = n.Attr, (0 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 0])).Key === "public") { $s = 10; continue; }
+			/* */ $s = 11; continue;
+			/* if ((x = n.Attr, (0 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 0])).Key === "public") { */ case 10:
+				_r$4 = strings.ToLower((x$1 = n.Attr, (0 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 0])).Val); /* */ $s = 12; case 12: if($c) { $c = false; _r$4 = _r$4.$blk(); } if (_r$4 && _r$4.$blk !== undefined) { break s; }
+				public$1 = _r$4;
+				_1 = public$1;
+				if (_1 === ("-//w3o//dtd w3 html strict 3.0//en//") || _1 === ("-/w3d/dtd html 4.0 transitional/en") || _1 === ("html")) {
+					quirks = true;
+				} else {
+					_ref = quirkyIDs;
+					_i = 0;
+					while (true) {
+						if (!(_i < _ref.$length)) { break; }
+						q$1 = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+						if (strings.HasPrefix(public$1, q$1)) {
+							quirks = true;
+							break;
+						}
+						_i++;
+					}
+				}
+				if ((n.Attr.$length === 1) && (strings.HasPrefix(public$1, "-//w3c//dtd html 4.01 frameset//") || strings.HasPrefix(public$1, "-//w3c//dtd html 4.01 transitional//"))) {
+					quirks = true;
+				}
+			/* } */ case 11:
+			lastAttr = $clone((x$2 = n.Attr, x$3 = n.Attr.$length - 1 >> 0, ((x$3 < 0 || x$3 >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + x$3])), Attribute);
+			if (!(lastAttr.Key === "system")) { _v = false; $s = 15; continue s; }
+			_r$5 = strings.ToLower(lastAttr.Val); /* */ $s = 16; case 16: if($c) { $c = false; _r$5 = _r$5.$blk(); } if (_r$5 && _r$5.$blk !== undefined) { break s; }
+			_v = _r$5 === "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd"; case 15:
+			/* */ if (_v) { $s = 13; continue; }
+			/* */ $s = 14; continue;
+			/* if (_v) { */ case 13:
+				quirks = true;
+			/* } */ case 14:
+		/* } */ case 9:
+		_tmp$2 = n;
+		_tmp$3 = quirks;
+		n = _tmp$2;
+		quirks = _tmp$3;
+		$s = -1; return [n, quirks];
+		/* */ } return; } if ($f === undefined) { $f = { $blk: parseDoctype }; } $f._1 = _1; $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._r$4 = _r$4; $f._r$5 = _r$5; $f._ref = _ref; $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f._tmp$2 = _tmp$2; $f._tmp$3 = _tmp$3; $f._v = _v; $f.id = id; $f.key = key; $f.lastAttr = lastAttr; $f.n = n; $f.public$1 = public$1; $f.q = q; $f.q$1 = q$1; $f.quirks = quirks; $f.quote = quote; $f.s = s; $f.space = space; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	unescapeEntity = function(b, dst, src, attribute) {
+		var _entry, _entry$1, _entry$2, _tmp, _tmp$1, _tmp$10, _tmp$11, _tmp$12, _tmp$13, _tmp$14, _tmp$15, _tmp$16, _tmp$17, _tmp$18, _tmp$19, _tmp$2, _tmp$3, _tmp$4, _tmp$5, _tmp$6, _tmp$7, _tmp$8, _tmp$9, attribute, b, c, c$1, dst, dst1, dst1$1, entityName, hex, i, j, maxLen, s, src, src1, x, x$1, x$2, x$3, x$4;
+		dst1 = 0;
+		src1 = 0;
+		_tmp = 1;
+		_tmp$1 = $subslice(b, src);
+		i = _tmp;
+		s = _tmp$1;
+		if (s.$length <= 1) {
+			((dst < 0 || dst >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + dst] = ((src < 0 || src >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + src]));
+			_tmp$2 = dst + 1 >> 0;
+			_tmp$3 = src + 1 >> 0;
+			dst1 = _tmp$2;
+			src1 = _tmp$3;
+			return [dst1, src1];
+		}
+		if (((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i]) === 35) {
+			if (s.$length <= 3) {
+				((dst < 0 || dst >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + dst] = ((src < 0 || src >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + src]));
+				_tmp$4 = dst + 1 >> 0;
+				_tmp$5 = src + 1 >> 0;
+				dst1 = _tmp$4;
+				src1 = _tmp$5;
+				return [dst1, src1];
+			}
+			i = i + (1) >> 0;
+			c = ((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i]);
+			hex = false;
+			if ((c === 120) || (c === 88)) {
+				hex = true;
+				i = i + (1) >> 0;
+			}
+			x = 0;
+			while (true) {
+				if (!(i < s.$length)) { break; }
+				c = ((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i]);
+				i = i + (1) >> 0;
+				if (hex) {
+					if (48 <= c && c <= 57) {
+						x = (($imul(16, x)) + ((c >> 0)) >> 0) - 48 >> 0;
+						continue;
+					} else if (97 <= c && c <= 102) {
+						x = ((($imul(16, x)) + ((c >> 0)) >> 0) - 97 >> 0) + 10 >> 0;
+						continue;
+					} else if (65 <= c && c <= 70) {
+						x = ((($imul(16, x)) + ((c >> 0)) >> 0) - 65 >> 0) + 10 >> 0;
+						continue;
+					}
+				} else if (48 <= c && c <= 57) {
+					x = (($imul(10, x)) + ((c >> 0)) >> 0) - 48 >> 0;
+					continue;
+				}
+				if (!((c === 59))) {
+					i = i - (1) >> 0;
+				}
+				break;
+			}
+			if (i <= 3) {
+				((dst < 0 || dst >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + dst] = ((src < 0 || src >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + src]));
+				_tmp$6 = dst + 1 >> 0;
+				_tmp$7 = src + 1 >> 0;
+				dst1 = _tmp$6;
+				src1 = _tmp$7;
+				return [dst1, src1];
+			}
+			if (128 <= x && x <= 159) {
+				x = (x$1 = x - 128 >> 0, ((x$1 < 0 || x$1 >= replacementTable.length) ? ($throwRuntimeError("index out of range"), undefined) : replacementTable[x$1]));
+			} else if ((x === 0) || (55296 <= x && x <= 57343) || x > 1114111) {
+				x = 65533;
+			}
+			_tmp$8 = dst + utf8.EncodeRune($subslice(b, dst), x) >> 0;
+			_tmp$9 = src + i >> 0;
+			dst1 = _tmp$8;
+			src1 = _tmp$9;
+			return [dst1, src1];
+		}
+		while (true) {
+			if (!(i < s.$length)) { break; }
+			c$1 = ((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i]);
+			i = i + (1) >> 0;
+			if (97 <= c$1 && c$1 <= 122 || 65 <= c$1 && c$1 <= 90 || 48 <= c$1 && c$1 <= 57) {
+				continue;
+			}
+			if (!((c$1 === 59))) {
+				i = i - (1) >> 0;
+			}
+			break;
+		}
+		entityName = ($bytesToString($subslice(s, 1, i)));
+		if (entityName === "") {
+		} else if (attribute && !((entityName.charCodeAt((entityName.length - 1 >> 0)) === 59)) && s.$length > i && (((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i]) === 61)) {
+		} else {
+			x$2 = (_entry = entity[$String.keyFor(entityName)], _entry !== undefined ? _entry.v : 0);
+			if (!((x$2 === 0))) {
+				_tmp$10 = dst + utf8.EncodeRune($subslice(b, dst), x$2) >> 0;
+				_tmp$11 = src + i >> 0;
+				dst1 = _tmp$10;
+				src1 = _tmp$11;
+				return [dst1, src1];
+			} else {
+				x$3 = $clone((_entry$1 = entity2[$String.keyFor(entityName)], _entry$1 !== undefined ? _entry$1.v : arrayType.zero()), arrayType);
+				if (!((x$3[0] === 0))) {
+					dst1$1 = dst + utf8.EncodeRune($subslice(b, dst), x$3[0]) >> 0;
+					_tmp$12 = dst1$1 + utf8.EncodeRune($subslice(b, dst1$1), x$3[1]) >> 0;
+					_tmp$13 = src + i >> 0;
+					dst1 = _tmp$12;
+					src1 = _tmp$13;
+					return [dst1, src1];
+				} else if (!attribute) {
+					maxLen = entityName.length - 1 >> 0;
+					if (maxLen > 6) {
+						maxLen = 6;
+					}
+					j = maxLen;
+					while (true) {
+						if (!(j > 1)) { break; }
+						x$4 = (_entry$2 = entity[$String.keyFor($substring(entityName, 0, j))], _entry$2 !== undefined ? _entry$2.v : 0);
+						if (!((x$4 === 0))) {
+							_tmp$14 = dst + utf8.EncodeRune($subslice(b, dst), x$4) >> 0;
+							_tmp$15 = (src + j >> 0) + 1 >> 0;
+							dst1 = _tmp$14;
+							src1 = _tmp$15;
+							return [dst1, src1];
+						}
+						j = j - (1) >> 0;
+					}
+				}
+			}
+		}
+		_tmp$16 = dst + i >> 0;
+		_tmp$17 = src + i >> 0;
+		dst1 = _tmp$16;
+		src1 = _tmp$17;
+		$copySlice($subslice(b, dst, dst1), $subslice(b, src, src1));
+		_tmp$18 = dst1;
+		_tmp$19 = src1;
+		dst1 = _tmp$18;
+		src1 = _tmp$19;
+		return [dst1, src1];
+	};
+	unescape = function(b, attribute) {
+		var _i, _ref, _tmp, _tmp$1, _tuple, _tuple$1, attribute, b, c, c$1, dst, i, src;
+		_ref = b;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			c = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (c === 38) {
+				_tuple = unescapeEntity(b, i, i, attribute);
+				dst = _tuple[0];
+				src = _tuple[1];
+				while (true) {
+					if (!(src < b.$length)) { break; }
+					c$1 = ((src < 0 || src >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + src]);
+					if (c$1 === 38) {
+						_tuple$1 = unescapeEntity(b, dst, src, attribute);
+						dst = _tuple$1[0];
+						src = _tuple$1[1];
+					} else {
+						((dst < 0 || dst >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + dst] = c$1);
+						_tmp = dst + 1 >> 0;
+						_tmp$1 = src + 1 >> 0;
+						dst = _tmp;
+						src = _tmp$1;
+					}
+				}
+				return $subslice(b, 0, dst);
+			}
+			_i++;
+		}
+		return b;
+	};
+	lower = function(b) {
+		var _i, _ref, b, c, i;
+		_ref = b;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			c = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (65 <= c && c <= 90) {
+				((i < 0 || i >= b.$length) ? ($throwRuntimeError("index out of range"), undefined) : b.$array[b.$offset + i] = ((c + 97 << 24 >>> 24) - 65 << 24 >>> 24));
+			}
+			_i++;
+		}
+		return b;
+	};
+	escape = function(w, s) {
+		var _1, _r, _r$1, _r$2, _tuple, _tuple$1, _tuple$2, err, err$1, err$2, esc, i, s, w, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; _tuple$2 = $f._tuple$2; err = $f.err; err$1 = $f.err$1; err$2 = $f.err$2; esc = $f.esc; i = $f.i; s = $f.s; w = $f.w; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		i = strings.IndexAny(s, "&'<>\"\r");
+		/* while (true) { */ case 1:
+			/* if (!(!((i === -1)))) { break; } */ if(!(!((i === -1)))) { $s = 2; continue; }
+			_r = w.WriteString($substring(s, 0, i)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_tuple = _r;
+			err = _tuple[1];
+			if (!($interfaceIsEqual(err, $ifaceNil))) {
+				$s = -1; return err;
+			}
+			esc = "";
+			_1 = s.charCodeAt(i);
+			if (_1 === (38)) {
+				esc = "&amp;";
+			} else if (_1 === (39)) {
+				esc = "&#39;";
+			} else if (_1 === (60)) {
+				esc = "&lt;";
+			} else if (_1 === (62)) {
+				esc = "&gt;";
+			} else if (_1 === (34)) {
+				esc = "&#34;";
+			} else if (_1 === (13)) {
+				esc = "&#13;";
+			} else {
+				$panic(new $String("unrecognized escape character"));
+			}
+			s = $substring(s, (i + 1 >> 0));
+			_r$1 = w.WriteString(esc); /* */ $s = 4; case 4: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			_tuple$1 = _r$1;
+			err$1 = _tuple$1[1];
+			if (!($interfaceIsEqual(err$1, $ifaceNil))) {
+				$s = -1; return err$1;
+			}
+			i = strings.IndexAny(s, "&'<>\"\r");
+		/* } */ $s = 1; continue; case 2:
+		_r$2 = w.WriteString(s); /* */ $s = 5; case 5: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+		_tuple$2 = _r$2;
+		err$2 = _tuple$2[1];
+		$s = -1; return err$2;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: escape }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f._tuple$2 = _tuple$2; $f.err = err; $f.err$1 = err$1; $f.err$2 = err$2; $f.esc = esc; $f.i = i; $f.s = s; $f.w = w; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	EscapeString = function(s) {
+		var _r, buf, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; buf = $f.buf; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		buf = [buf];
+		if (strings.IndexAny(s, "&'<>\"\r") === -1) {
+			$s = -1; return s;
+		}
+		buf[0] = new bytes.Buffer.ptr(sliceType$3.nil, 0, arrayType$1.zero(), 0);
+		_r = escape(buf[0], s); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_r;
+		$s = -1; return buf[0].String();
+		/* */ } return; } if ($f === undefined) { $f = { $blk: EscapeString }; } $f._r = _r; $f.buf = buf; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.EscapeString = EscapeString;
+	adjustAttributeNames = function(aa, nameMap) {
+		var _entry, _i, _ref, _tuple, aa, i, nameMap, newName, ok;
+		_ref = aa;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			_tuple = (_entry = nameMap[$String.keyFor(((i < 0 || i >= aa.$length) ? ($throwRuntimeError("index out of range"), undefined) : aa.$array[aa.$offset + i]).Key)], _entry !== undefined ? [_entry.v, true] : ["", false]);
+			newName = _tuple[0];
+			ok = _tuple[1];
+			if (ok) {
+				((i < 0 || i >= aa.$length) ? ($throwRuntimeError("index out of range"), undefined) : aa.$array[aa.$offset + i]).Key = newName;
+			}
+			_i++;
+		}
+	};
+	adjustForeignAttributes = function(aa) {
+		var _1, _i, _ref, a, aa, i, j;
+		_ref = aa;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			a = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+			if (a.Key === "" || !((a.Key.charCodeAt(0) === 120))) {
+				_i++;
+				continue;
+			}
+			_1 = a.Key;
+			if (_1 === ("xlink:actuate") || _1 === ("xlink:arcrole") || _1 === ("xlink:href") || _1 === ("xlink:role") || _1 === ("xlink:show") || _1 === ("xlink:title") || _1 === ("xlink:type") || _1 === ("xml:base") || _1 === ("xml:lang") || _1 === ("xml:space") || _1 === ("xmlns:xlink")) {
+				j = strings.Index(a.Key, ":");
+				((i < 0 || i >= aa.$length) ? ($throwRuntimeError("index out of range"), undefined) : aa.$array[aa.$offset + i]).Namespace = $substring(a.Key, 0, j);
+				((i < 0 || i >= aa.$length) ? ($throwRuntimeError("index out of range"), undefined) : aa.$array[aa.$offset + i]).Key = $substring(a.Key, (j + 1 >> 0));
+			}
+			_i++;
+		}
+	};
+	htmlIntegrationPoint = function(n) {
+		var _1, _2, _i, _r, _ref, a, n, val, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _i = $f._i; _r = $f._r; _ref = $f._ref; a = $f.a; n = $f.n; val = $f.val; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (!((n.Type === 3))) {
+			$s = -1; return false;
+		}
+			_1 = n.Namespace;
+			/* */ if (_1 === ("math")) { $s = 2; continue; }
+			/* */ if (_1 === ("svg")) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (_1 === ("math")) { */ case 2:
+				/* */ if (n.Data === "annotation-xml") { $s = 5; continue; }
+				/* */ $s = 6; continue;
+				/* if (n.Data === "annotation-xml") { */ case 5:
+					_ref = n.Attr;
+					_i = 0;
+					/* while (true) { */ case 7:
+						/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 8; continue; }
+						a = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+						/* */ if (a.Key === "encoding") { $s = 9; continue; }
+						/* */ $s = 10; continue;
+						/* if (a.Key === "encoding") { */ case 9:
+							_r = strings.ToLower(a.Val); /* */ $s = 11; case 11: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+							val = _r;
+							if (val === "text/html" || val === "application/xhtml+xml") {
+								$s = -1; return true;
+							}
+						/* } */ case 10:
+						_i++;
+					/* } */ $s = 7; continue; case 8:
+				/* } */ case 6:
+				$s = 4; continue;
+			/* } else if (_1 === ("svg")) { */ case 3:
+				_2 = n.Data;
+				if (_2 === ("desc") || _2 === ("foreignObject") || _2 === ("title")) {
+					$s = -1; return true;
+				}
+			/* } */ case 4:
+		case 1:
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: htmlIntegrationPoint }; } $f._1 = _1; $f._2 = _2; $f._i = _i; $f._r = _r; $f._ref = _ref; $f.a = a; $f.n = n; $f.val = val; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	mathMLTextIntegrationPoint = function(n) {
+		var _1, n;
+		if (!(n.Namespace === "math")) {
+			return false;
+		}
+		_1 = n.Data;
+		if (_1 === ("mi") || _1 === ("mo") || _1 === ("mn") || _1 === ("ms") || _1 === ("mtext")) {
+			return true;
+		}
+		return false;
+	};
+	Node.ptr.prototype.InsertBefore = function(newChild, oldChild) {
+		var _tmp, _tmp$1, _tmp$2, _tmp$3, n, newChild, next, oldChild, prev;
+		n = this;
+		if (!(newChild.Parent === ptrType.nil) || !(newChild.PrevSibling === ptrType.nil) || !(newChild.NextSibling === ptrType.nil)) {
+			$panic(new $String("html: InsertBefore called for an attached child Node"));
+		}
+		_tmp = ptrType.nil;
+		_tmp$1 = ptrType.nil;
+		prev = _tmp;
+		next = _tmp$1;
+		if (!(oldChild === ptrType.nil)) {
+			_tmp$2 = oldChild.PrevSibling;
+			_tmp$3 = oldChild;
+			prev = _tmp$2;
+			next = _tmp$3;
+		} else {
+			prev = n.LastChild;
+		}
+		if (!(prev === ptrType.nil)) {
+			prev.NextSibling = newChild;
+		} else {
+			n.FirstChild = newChild;
+		}
+		if (!(next === ptrType.nil)) {
+			next.PrevSibling = newChild;
+		} else {
+			n.LastChild = newChild;
+		}
+		newChild.Parent = n;
+		newChild.PrevSibling = prev;
+		newChild.NextSibling = next;
+	};
+	Node.prototype.InsertBefore = function(newChild, oldChild) { return this.$val.InsertBefore(newChild, oldChild); };
+	Node.ptr.prototype.AppendChild = function(c) {
+		var c, last, n;
+		n = this;
+		if (!(c.Parent === ptrType.nil) || !(c.PrevSibling === ptrType.nil) || !(c.NextSibling === ptrType.nil)) {
+			$panic(new $String("html: AppendChild called for an attached child Node"));
+		}
+		last = n.LastChild;
+		if (!(last === ptrType.nil)) {
+			last.NextSibling = c;
+		} else {
+			n.FirstChild = c;
+		}
+		n.LastChild = c;
+		c.Parent = n;
+		c.PrevSibling = last;
+	};
+	Node.prototype.AppendChild = function(c) { return this.$val.AppendChild(c); };
+	Node.ptr.prototype.RemoveChild = function(c) {
+		var c, n;
+		n = this;
+		if (!(c.Parent === n)) {
+			$panic(new $String("html: RemoveChild called for a non-child Node"));
+		}
+		if (n.FirstChild === c) {
+			n.FirstChild = c.NextSibling;
+		}
+		if (!(c.NextSibling === ptrType.nil)) {
+			c.NextSibling.PrevSibling = c.PrevSibling;
+		}
+		if (n.LastChild === c) {
+			n.LastChild = c.PrevSibling;
+		}
+		if (!(c.PrevSibling === ptrType.nil)) {
+			c.PrevSibling.NextSibling = c.NextSibling;
+		}
+		c.Parent = ptrType.nil;
+		c.PrevSibling = ptrType.nil;
+		c.NextSibling = ptrType.nil;
+	};
+	Node.prototype.RemoveChild = function(c) { return this.$val.RemoveChild(c); };
+	reparentChildren = function(dst, src) {
+		var child, dst, src;
+		while (true) {
+			child = src.FirstChild;
+			if (child === ptrType.nil) {
+				break;
+			}
+			src.RemoveChild(child);
+			dst.AppendChild(child);
+		}
+	};
+	Node.ptr.prototype.clone = function() {
+		var m, n;
+		n = this;
+		m = new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, n.Type, n.DataAtom, n.Data, "", $makeSlice(sliceType$1, n.Attr.$length));
+		$copySlice(m.Attr, n.Attr);
+		return m;
+	};
+	Node.prototype.clone = function() { return this.$val.clone(); };
+	$ptrType(nodeStack).prototype.pop = function() {
+		var i, n, s, x, x$1;
+		s = this;
+		i = s.$get().$length;
+		n = (x = s.$get(), x$1 = i - 1 >> 0, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+		s.$set($subslice((s.$get()), 0, (i - 1 >> 0)));
+		return n;
+	};
+	$ptrType(nodeStack).prototype.top = function() {
+		var i, s, x, x$1;
+		s = this;
+		i = s.$get().$length;
+		if (i > 0) {
+			return (x = s.$get(), x$1 = i - 1 >> 0, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+		}
+		return ptrType.nil;
+	};
+	$ptrType(nodeStack).prototype.index = function(n) {
+		var i, n, s, x;
+		s = this;
+		i = s.$get().$length - 1 >> 0;
+		while (true) {
+			if (!(i >= 0)) { break; }
+			if ((x = s.$get(), ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i])) === n) {
+				return i;
+			}
+			i = i - (1) >> 0;
+		}
+		return -1;
+	};
+	$ptrType(nodeStack).prototype.contains = function(a) {
+		var _i, _ref, a, n, s;
+		s = this;
+		_ref = s.$get();
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			n = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (n.DataAtom === a) {
+				return true;
+			}
+			_i++;
+		}
+		return false;
+	};
+	$ptrType(nodeStack).prototype.insert = function(i, n) {
+		var i, n, s, x;
+		s = this;
+		s.$set($append(s.$get(), ptrType.nil));
+		$copySlice($subslice((s.$get()), (i + 1 >> 0)), $subslice((s.$get()), i));
+		(x = s.$get(), ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i] = n));
+	};
+	$ptrType(nodeStack).prototype.remove = function(n) {
+		var i, j, n, s, x;
+		s = this;
+		i = s.index(n);
+		if (i === -1) {
+			return;
+		}
+		$copySlice($subslice((s.$get()), i), $subslice((s.$get()), (i + 1 >> 0)));
+		j = s.$get().$length - 1 >> 0;
+		(x = s.$get(), ((j < 0 || j >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + j] = ptrType.nil));
+		s.$set($subslice((s.$get()), 0, j));
+	};
+	$ptrType(insertionModeStack).prototype.pop = function() {
+		var i, im, s, x, x$1;
+		im = $throwNilPointerError;
+		s = this;
+		i = s.$get().$length;
+		im = (x = s.$get(), x$1 = i - 1 >> 0, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+		s.$set($subslice((s.$get()), 0, (i - 1 >> 0)));
+		im = im;
+		return im;
+	};
+	$ptrType(insertionModeStack).prototype.top = function() {
+		var i, s, x, x$1;
+		s = this;
+		i = s.$get().$length;
+		if (i > 0) {
+			return (x = s.$get(), x$1 = i - 1 >> 0, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+		}
+		return $throwNilPointerError;
+	};
+	parser.ptr.prototype.top = function() {
+		var n, p;
+		p = this;
+		n = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top();
+		if (!(n === ptrType.nil)) {
+			return n;
+		}
+		return p.doc;
+	};
+	parser.prototype.top = function() { return this.$val.top(); };
+	parser.ptr.prototype.popUntil = function(s, matchTags) {
+		var i, matchTags, p, s;
+		p = this;
+		i = p.indexOfElementInScope(s, matchTags);
+		if (!((i === -1))) {
+			p.oe = $subslice(p.oe, 0, i);
+			return true;
+		}
+		return false;
+	};
+	parser.prototype.popUntil = function(s, matchTags) { return this.$val.popUntil(s, matchTags); };
+	parser.ptr.prototype.indexOfElementInScope = function(s, matchTags) {
+		var _1, _2, _entry, _i, _i$1, _ref, _ref$1, i, matchTags, p, s, t, t$1, tagAtom, x, x$1, x$2;
+		p = this;
+		i = p.oe.$length - 1 >> 0;
+		while (true) {
+			if (!(i >= 0)) { break; }
+			tagAtom = (x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i])).DataAtom;
+			if ((x$1 = p.oe, ((i < 0 || i >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + i])).Namespace === "") {
+				_ref = matchTags;
+				_i = 0;
+				while (true) {
+					if (!(_i < _ref.$length)) { break; }
+					t = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+					if (t === tagAtom) {
+						return i;
+					}
+					_i++;
+				}
+				_1 = s;
+				if (_1 === (0)) {
+				} else if (_1 === (1)) {
+					if ((tagAtom === 79618) || (tagAtom === 42754)) {
+						return -1;
+					}
+				} else if (_1 === (2)) {
+					if (tagAtom === 102662) {
+						return -1;
+					}
+				} else if (_1 === (3)) {
+					if ((tagAtom === 22020) || (tagAtom === 365829) || (tagAtom === 463880)) {
+						return -1;
+					}
+				} else if (_1 === (6)) {
+					if (!((tagAtom === 24328)) && !((tagAtom === 451334))) {
+						return -1;
+					}
+				} else {
+					$panic(new $String("unreachable"));
+				}
+			}
+			_2 = s;
+			if ((_2 === (0)) || (_2 === (1)) || (_2 === (2))) {
+				_ref$1 = (_entry = defaultScopeStopTags[$String.keyFor((x$2 = p.oe, ((i < 0 || i >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + i])).Namespace)], _entry !== undefined ? _entry.v : sliceType$2.nil);
+				_i$1 = 0;
+				while (true) {
+					if (!(_i$1 < _ref$1.$length)) { break; }
+					t$1 = ((_i$1 < 0 || _i$1 >= _ref$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref$1.$array[_ref$1.$offset + _i$1]);
+					if (t$1 === tagAtom) {
+						return -1;
+					}
+					_i$1++;
+				}
+			}
+			i = i - (1) >> 0;
+		}
+		return -1;
+	};
+	parser.prototype.indexOfElementInScope = function(s, matchTags) { return this.$val.indexOfElementInScope(s, matchTags); };
+	parser.ptr.prototype.elementInScope = function(s, matchTags) {
+		var matchTags, p, s;
+		p = this;
+		return !((p.indexOfElementInScope(s, matchTags) === -1));
+	};
+	parser.prototype.elementInScope = function(s, matchTags) { return this.$val.elementInScope(s, matchTags); };
+	parser.ptr.prototype.clearStackToContext = function(s) {
+		var _1, i, p, s, tagAtom, x;
+		p = this;
+		i = p.oe.$length - 1 >> 0;
+		while (true) {
+			if (!(i >= 0)) { break; }
+			tagAtom = (x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i])).DataAtom;
+			_1 = s;
+			if (_1 === (3)) {
+				if ((tagAtom === 22020) || (tagAtom === 365829) || (tagAtom === 463880)) {
+					p.oe = $subslice(p.oe, 0, (i + 1 >> 0));
+					return;
+				}
+			} else if (_1 === (4)) {
+				if ((tagAtom === 22020) || (tagAtom === 52226) || (tagAtom === 463880)) {
+					p.oe = $subslice(p.oe, 0, (i + 1 >> 0));
+					return;
+				}
+			} else if (_1 === (5)) {
+				if ((tagAtom === 22020) || (tagAtom === 9989) || (tagAtom === 62725) || (tagAtom === 208901) || (tagAtom === 463880)) {
+					p.oe = $subslice(p.oe, 0, (i + 1 >> 0));
+					return;
+				}
+			} else {
+				$panic(new $String("unreachable"));
+			}
+			i = i - (1) >> 0;
+		}
+	};
+	parser.prototype.clearStackToContext = function(s) { return this.$val.clearStackToContext(s); };
+	parser.ptr.prototype.generateImpliedEndTags = function(exceptions) {
+		var _1, _i, _ref, except, exceptions, i, n, p, x;
+		p = this;
+		i = 0;
+		i = p.oe.$length - 1 >> 0;
+		loop:
+		while (true) {
+			if (!(i >= 0)) { break; }
+			n = (x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i]));
+			if (n.Type === 3) {
+				_1 = n.DataAtom;
+				if ((_1 === (186114)) || (_1 === (412418)) || (_1 === (45570)) || (_1 === (24328)) || (_1 === (451334)) || (_1 === (3073)) || (_1 === (14850)) || (_1 === (146434)) || (_1 === (104962)) || (_1 === (104963))) {
+					_ref = exceptions;
+					_i = 0;
+					while (true) {
+						if (!(_i < _ref.$length)) { break; }
+						except = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+						if (n.Data === except) {
+							break loop;
+						}
+						_i++;
+					}
+					i = i - (1) >> 0;
+					continue;
+				}
+			}
+			break;
+		}
+		p.oe = $subslice(p.oe, 0, (i + 1 >> 0));
+	};
+	parser.prototype.generateImpliedEndTags = function(exceptions) { return this.$val.generateImpliedEndTags(exceptions); };
+	parser.ptr.prototype.addChild = function(n) {
+		var n, p;
+		p = this;
+		if (p.shouldFosterParent()) {
+			p.fosterParent(n);
+		} else {
+			p.top().AppendChild(n);
+		}
+		if (n.Type === 3) {
+			p.oe = $append(p.oe, n);
+		}
+	};
+	parser.prototype.addChild = function(n) { return this.$val.addChild(n); };
+	parser.ptr.prototype.shouldFosterParent = function() {
+		var _1, p;
+		p = this;
+		if (p.fosterParenting) {
+			_1 = p.top().DataAtom;
+			if ((_1 === (365829)) || (_1 === (9989)) || (_1 === (62725)) || (_1 === (208901)) || (_1 === (52226))) {
+				return true;
+			}
+		}
+		return false;
+	};
+	parser.prototype.shouldFosterParent = function() { return this.$val.shouldFosterParent(); };
+	parser.ptr.prototype.fosterParent = function(n) {
+		var _tmp, _tmp$1, _tmp$2, _tmp$3, i, j, n, p, parent, prev, table, template, x, x$1, x$2, x$3, x$4, x$5, x$6;
+		p = this;
+		_tmp = ptrType.nil;
+		_tmp$1 = ptrType.nil;
+		_tmp$2 = ptrType.nil;
+		_tmp$3 = ptrType.nil;
+		table = _tmp;
+		parent = _tmp$1;
+		prev = _tmp$2;
+		template = _tmp$3;
+		i = 0;
+		i = p.oe.$length - 1 >> 0;
+		while (true) {
+			if (!(i >= 0)) { break; }
+			if ((x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i])).DataAtom === 365829) {
+				table = (x$1 = p.oe, ((i < 0 || i >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + i]));
+				break;
+			}
+			i = i - (1) >> 0;
+		}
+		j = 0;
+		j = p.oe.$length - 1 >> 0;
+		while (true) {
+			if (!(j >= 0)) { break; }
+			if ((x$2 = p.oe, ((j < 0 || j >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + j])).DataAtom === 463880) {
+				template = (x$3 = p.oe, ((j < 0 || j >= x$3.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$3.$array[x$3.$offset + j]));
+				break;
+			}
+			j = j - (1) >> 0;
+		}
+		if (!(template === ptrType.nil) && (table === ptrType.nil || j > i)) {
+			template.AppendChild(n);
+			return;
+		}
+		if (table === ptrType.nil) {
+			parent = (x$4 = p.oe, (0 >= x$4.$length ? ($throwRuntimeError("index out of range"), undefined) : x$4.$array[x$4.$offset + 0]));
+		} else {
+			parent = table.Parent;
+		}
+		if (parent === ptrType.nil) {
+			parent = (x$5 = p.oe, x$6 = i - 1 >> 0, ((x$6 < 0 || x$6 >= x$5.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$5.$array[x$5.$offset + x$6]));
+		}
+		if (!(table === ptrType.nil)) {
+			prev = table.PrevSibling;
+		} else {
+			prev = parent.LastChild;
+		}
+		if (!(prev === ptrType.nil) && (prev.Type === 1) && (n.Type === 1)) {
+			prev.Data = prev.Data + (n.Data);
+			return;
+		}
+		parent.InsertBefore(n, table);
+	};
+	parser.prototype.fosterParent = function(n) { return this.$val.fosterParent(n); };
+	parser.ptr.prototype.addText = function(text) {
+		var n, p, t, text;
+		p = this;
+		if (text === "") {
+			return;
+		}
+		if (p.shouldFosterParent()) {
+			p.fosterParent(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 1, 0, text, "", sliceType$1.nil));
+			return;
+		}
+		t = p.top();
+		n = t.LastChild;
+		if (!(n === ptrType.nil) && (n.Type === 1)) {
+			n.Data = n.Data + (text);
+			return;
+		}
+		p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 1, 0, text, "", sliceType$1.nil));
+	};
+	parser.prototype.addText = function(text) { return this.$val.addText(text); };
+	parser.ptr.prototype.addElement = function() {
+		var p;
+		p = this;
+		p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 3, p.tok.DataAtom, p.tok.Data, "", p.tok.Attr));
+	};
+	parser.prototype.addElement = function() { return this.$val.addElement(); };
+	parser.ptr.prototype.addFormattingElement = function() {
+		var _i, _i$1, _ref, _ref$1, _tmp, _tmp$1, attr, i, identicalElements, n, p, t0, t1, tagAtom, x;
+		p = this;
+		_tmp = p.tok.DataAtom;
+		_tmp$1 = p.tok.Attr;
+		tagAtom = _tmp;
+		attr = _tmp$1;
+		p.addElement();
+		identicalElements = 0;
+		i = p.afe.$length - 1 >> 0;
+		findIdenticalElements:
+		while (true) {
+			if (!(i >= 0)) { break; }
+			n = (x = p.afe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i]));
+			if (n.Type === 6) {
+				break;
+			}
+			if (!((n.Type === 3))) {
+				i = i - (1) >> 0;
+				continue;
+			}
+			if (!(n.Namespace === "")) {
+				i = i - (1) >> 0;
+				continue;
+			}
+			if (!((n.DataAtom === tagAtom))) {
+				i = i - (1) >> 0;
+				continue;
+			}
+			if (!((n.Attr.$length === attr.$length))) {
+				i = i - (1) >> 0;
+				continue;
+			}
+			_ref = n.Attr;
+			_i = 0;
+			compareAttributes:
+			while (true) {
+				if (!(_i < _ref.$length)) { break; }
+				t0 = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+				_ref$1 = attr;
+				_i$1 = 0;
+				while (true) {
+					if (!(_i$1 < _ref$1.$length)) { break; }
+					t1 = $clone(((_i$1 < 0 || _i$1 >= _ref$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref$1.$array[_ref$1.$offset + _i$1]), Attribute);
+					if (t0.Key === t1.Key && t0.Namespace === t1.Namespace && t0.Val === t1.Val) {
+						_i++;
+						continue compareAttributes;
+					}
+					_i$1++;
+				}
+				i = i - (1) >> 0;
+				continue findIdenticalElements;
+			}
+			identicalElements = identicalElements + (1) >> 0;
+			if (identicalElements >= 3) {
+				(p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).remove(n);
+			}
+			i = i - (1) >> 0;
+		}
+		p.afe = $append(p.afe, p.top());
+	};
+	parser.prototype.addFormattingElement = function() { return this.$val.addFormattingElement(); };
+	parser.ptr.prototype.clearActiveFormattingElements = function() {
+		var n, p;
+		p = this;
+		while (true) {
+			n = (p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).pop();
+			if ((p.afe.$length === 0) || (n.Type === 6)) {
+				return;
+			}
+		}
+	};
+	parser.prototype.clearActiveFormattingElements = function() { return this.$val.clearActiveFormattingElements(); };
+	parser.ptr.prototype.reconstructActiveFormattingElements = function() {
+		var clone, i, n, p, x, x$1, x$2;
+		p = this;
+		n = (p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).top();
+		if (n === ptrType.nil) {
+			return;
+		}
+		if ((n.Type === 6) || !(((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).index(n) === -1))) {
+			return;
+		}
+		i = p.afe.$length - 1 >> 0;
+		while (true) {
+			if (!(!((n.Type === 6)) && ((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).index(n) === -1))) { break; }
+			if (i === 0) {
+				i = -1;
+				break;
+			}
+			i = i - (1) >> 0;
+			n = (x = p.afe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i]));
+		}
+		while (true) {
+			i = i + (1) >> 0;
+			clone = (x$1 = p.afe, ((i < 0 || i >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + i])).clone();
+			p.addChild(clone);
+			(x$2 = p.afe, ((i < 0 || i >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + i] = clone));
+			if (i === (p.afe.$length - 1 >> 0)) {
+				break;
+			}
+		}
+	};
+	parser.prototype.reconstructActiveFormattingElements = function() { return this.$val.reconstructActiveFormattingElements(); };
+	parser.ptr.prototype.acknowledgeSelfClosingTag = function() {
+		var p;
+		p = this;
+		p.hasSelfClosingToken = false;
+	};
+	parser.prototype.acknowledgeSelfClosingTag = function() { return this.$val.acknowledgeSelfClosingTag(); };
+	parser.ptr.prototype.setOriginalIM = function() {
+		var p;
+		p = this;
+		if (!(p.originalIM === $throwNilPointerError)) {
+			$panic(new $String("html: bad parser state: originalIM was set twice"));
+		}
+		p.originalIM = p.im;
+	};
+	parser.prototype.setOriginalIM = function() { return this.$val.setOriginalIM(); };
+	parser.ptr.prototype.resetInsertionMode = function() {
+		var _1, _2, _tmp, _tmp$1, ancestor, first, i, last, n, p, x, x$1, x$2, x$3;
+		p = this;
+		i = p.oe.$length - 1 >> 0;
+		while (true) {
+			if (!(i >= 0)) { break; }
+			n = (x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i]));
+			last = i === 0;
+			if (last && !(p.context === ptrType.nil)) {
+				n = p.context;
+			}
+			_1 = n.DataAtom;
+			if (_1 === (408582)) {
+				if (!last) {
+					_tmp = n;
+					_tmp$1 = (x$1 = p.oe, (0 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 0]));
+					ancestor = _tmp;
+					first = _tmp$1;
+					while (true) {
+						if (!(!(ancestor === first))) { break; }
+						if (ancestor === first) {
+							break;
+						}
+						ancestor = (x$2 = p.oe, x$3 = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).index(ancestor) - 1 >> 0, ((x$3 < 0 || x$3 >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + x$3]));
+						_2 = ancestor.DataAtom;
+						if (_2 === (463880)) {
+							p.im = inSelectIM;
+							return;
+						} else if (_2 === (365829)) {
+							p.im = inSelectInTableIM;
+							return;
+						}
+					}
+				}
+				p.im = inSelectIM;
+			} else if ((_1 === (37378)) || (_1 === (87554))) {
+				p.im = inCellIM;
+			} else if (_1 === (52226)) {
+				p.im = inRowIM;
+			} else if ((_1 === (9989)) || (_1 === (208901)) || (_1 === (62725))) {
+				p.im = inTableBodyIM;
+			} else if (_1 === (143623)) {
+				p.im = inCaptionIM;
+			} else if (_1 === (109320)) {
+				p.im = inColumnGroupIM;
+			} else if (_1 === (365829)) {
+				p.im = inTableIM;
+			} else if (_1 === (463880)) {
+				p.im = (p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).top();
+			} else if (_1 === (209156)) {
+				p.im = inHeadIM;
+			} else if (_1 === (10244)) {
+				p.im = inBodyIM;
+			} else if (_1 === (35592)) {
+				p.im = inFramesetIM;
+			} else if (_1 === (22020)) {
+				if (p.head === ptrType.nil) {
+					p.im = beforeHeadIM;
+				} else {
+					p.im = afterHeadIM;
+				}
+			} else {
+				if (last) {
+					p.im = inBodyIM;
+					return;
+				}
+				i = i - (1) >> 0;
+				continue;
+			}
+			return;
+		}
+	};
+	parser.prototype.resetInsertionMode = function() { return this.$val.resetInsertionMode(); };
+	initialIM = function(p) {
+		var _1, _r, _r$1, _tuple, n, p, quirks, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; _tuple = $f._tuple; n = $f.n; p = $f.p; quirks = $f.quirks; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (5)) { $s = 3; continue; }
+			/* */ if (_1 === (6)) { $s = 4; continue; }
+			/* */ $s = 5; continue;
+			/* if (_1 === (1)) { */ case 2:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 6; case 6: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				p.tok.Data = _r;
+				if (p.tok.Data.length === 0) {
+					$s = -1; return true;
+				}
+				$s = 5; continue;
+			/* } else if (_1 === (5)) { */ case 3:
+				p.doc.AppendChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } else if (_1 === (6)) { */ case 4:
+				_r$1 = parseDoctype(p.tok.Data); /* */ $s = 7; case 7: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+				_tuple = _r$1;
+				n = _tuple[0];
+				quirks = _tuple[1];
+				p.doc.AppendChild(n);
+				p.quirks = quirks;
+				p.im = beforeHTMLIM;
+				$s = -1; return true;
+			/* } */ case 5:
+		case 1:
+		p.quirks = true;
+		p.im = beforeHTMLIM;
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: initialIM }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f._tuple = _tuple; $f.n = n; $f.p = p; $f.quirks = quirks; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	beforeHTMLIM = function(p) {
+		var _1, _2, _r, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _r = $f._r; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (6)) { $s = 2; continue; }
+			/* */ if (_1 === (1)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (3)) { $s = 5; continue; }
+			/* */ if (_1 === (5)) { $s = 6; continue; }
+			/* */ $s = 7; continue;
+			/* if (_1 === (6)) { */ case 2:
+				$s = -1; return true;
+			/* } else if (_1 === (1)) { */ case 3:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 8; case 8: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				p.tok.Data = _r;
+				if (p.tok.Data.length === 0) {
+					$s = -1; return true;
+				}
+				$s = 7; continue;
+			/* } else if (_1 === (2)) { */ case 4:
+				if (p.tok.DataAtom === 22020) {
+					p.addElement();
+					p.im = beforeHeadIM;
+					$s = -1; return true;
+				}
+				$s = 7; continue;
+			/* } else if (_1 === (3)) { */ case 5:
+					_2 = p.tok.DataAtom;
+					/* */ if ((_2 === (209156)) || (_2 === (10244)) || (_2 === (22020)) || (_2 === (514))) { $s = 10; continue; }
+					/* */ $s = 11; continue;
+					/* if ((_2 === (209156)) || (_2 === (10244)) || (_2 === (22020)) || (_2 === (514))) { */ case 10:
+						$r = p.parseImpliedToken(2, 22020, new atom.Atom(22020).String()); /* */ $s = 13; case 13: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$s = -1; return false;
+					/* } else { */ case 11:
+						$s = -1; return true;
+					/* } */ case 12:
+				case 9:
+				$s = 7; continue;
+			/* } else if (_1 === (5)) { */ case 6:
+				p.doc.AppendChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } */ case 7:
+		case 1:
+		$r = p.parseImpliedToken(2, 22020, new atom.Atom(22020).String()); /* */ $s = 14; case 14: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: beforeHTMLIM }; } $f._1 = _1; $f._2 = _2; $f._r = _r; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	beforeHeadIM = function(p) {
+		var _1, _2, _3, _r, _r$1, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; _r$1 = $f._r$1; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (2)) { $s = 3; continue; }
+			/* */ if (_1 === (3)) { $s = 4; continue; }
+			/* */ if (_1 === (5)) { $s = 5; continue; }
+			/* */ if (_1 === (6)) { $s = 6; continue; }
+			/* */ $s = 7; continue;
+			/* if (_1 === (1)) { */ case 2:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 8; case 8: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				p.tok.Data = _r;
+				if (p.tok.Data.length === 0) {
+					$s = -1; return true;
+				}
+				$s = 7; continue;
+			/* } else if (_1 === (2)) { */ case 3:
+					_2 = p.tok.DataAtom;
+					/* */ if (_2 === (209156)) { $s = 10; continue; }
+					/* */ if (_2 === (22020)) { $s = 11; continue; }
+					/* */ $s = 12; continue;
+					/* if (_2 === (209156)) { */ case 10:
+						p.addElement();
+						p.head = p.top();
+						p.im = inHeadIM;
+						$s = -1; return true;
+					/* } else if (_2 === (22020)) { */ case 11:
+						_r$1 = inBodyIM(p); /* */ $s = 13; case 13: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } */ case 12:
+				case 9:
+				$s = 7; continue;
+			/* } else if (_1 === (3)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if ((_3 === (209156)) || (_3 === (10244)) || (_3 === (22020)) || (_3 === (514))) { $s = 15; continue; }
+					/* */ $s = 16; continue;
+					/* if ((_3 === (209156)) || (_3 === (10244)) || (_3 === (22020)) || (_3 === (514))) { */ case 15:
+						$r = p.parseImpliedToken(2, 209156, new atom.Atom(209156).String()); /* */ $s = 18; case 18: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$s = -1; return false;
+					/* } else { */ case 16:
+						$s = -1; return true;
+					/* } */ case 17:
+				case 14:
+				$s = 7; continue;
+			/* } else if (_1 === (5)) { */ case 5:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } else if (_1 === (6)) { */ case 6:
+				$s = -1; return true;
+			/* } */ case 7:
+		case 1:
+		$r = p.parseImpliedToken(2, 209156, new atom.Atom(209156).String()); /* */ $s = 19; case 19: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: beforeHeadIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f._r$1 = _r$1; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inHeadIM = function(p) {
+		var _1, _2, _3, _r, _r$1, i, n, p, s, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; _r$1 = $f._r$1; i = $f.i; n = $f.n; p = $f.p; s = $f.s; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (2)) { $s = 3; continue; }
+			/* */ if (_1 === (3)) { $s = 4; continue; }
+			/* */ if (_1 === (5)) { $s = 5; continue; }
+			/* */ if (_1 === (6)) { $s = 6; continue; }
+			/* */ $s = 7; continue;
+			/* if (_1 === (1)) { */ case 2:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 8; case 8: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				if (s.length < p.tok.Data.length) {
+					p.addText($substring(p.tok.Data, 0, (p.tok.Data.length - s.length >> 0)));
+					if (s === "") {
+						$s = -1; return true;
+					}
+					p.tok.Data = s;
+				}
+				$s = 7; continue;
+			/* } else if (_1 === (2)) { */ case 3:
+					_2 = p.tok.DataAtom;
+					/* */ if (_2 === (22020)) { $s = 10; continue; }
+					/* */ if ((_2 === (15108)) || (_2 === (15112)) || (_2 === (89607)) || (_2 === (120583)) || (_2 === (95236)) || (_2 === (309252))) { $s = 11; continue; }
+					/* */ if ((_2 === (137222)) || (_2 === (69637)) || (_2 === (136712)) || (_2 === (35080)) || (_2 === (458501))) { $s = 12; continue; }
+					/* */ if (_2 === (209156)) { $s = 13; continue; }
+					/* */ if (_2 === (463880)) { $s = 14; continue; }
+					/* */ $s = 15; continue;
+					/* if (_2 === (22020)) { */ case 10:
+						_r$1 = inBodyIM(p); /* */ $s = 16; case 16: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if ((_2 === (15108)) || (_2 === (15112)) || (_2 === (89607)) || (_2 === (120583)) || (_2 === (95236)) || (_2 === (309252))) { */ case 11:
+						p.addElement();
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.acknowledgeSelfClosingTag();
+						$s = -1; return true;
+					/* } else if ((_2 === (137222)) || (_2 === (69637)) || (_2 === (136712)) || (_2 === (35080)) || (_2 === (458501))) { */ case 12:
+						p.addElement();
+						p.setOriginalIM();
+						p.im = textIM;
+						$s = -1; return true;
+					/* } else if (_2 === (209156)) { */ case 13:
+						$s = -1; return true;
+					/* } else if (_2 === (463880)) { */ case 14:
+						p.addElement();
+						p.afe = $append(p.afe, scopeMarker);
+						p.framesetOK = false;
+						p.im = inTemplateIM;
+						p.templateStack = $append(p.templateStack, inTemplateIM);
+						$s = -1; return true;
+					/* } */ case 15:
+				case 9:
+				$s = 7; continue;
+			/* } else if (_1 === (3)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (209156)) { $s = 18; continue; }
+					/* */ if ((_3 === (10244)) || (_3 === (22020)) || (_3 === (514))) { $s = 19; continue; }
+					/* */ if (_3 === (463880)) { $s = 20; continue; }
+					/* */ $s = 21; continue;
+					/* if (_3 === (209156)) { */ case 18:
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.im = afterHeadIM;
+						$s = -1; return true;
+					/* } else if ((_3 === (10244)) || (_3 === (22020)) || (_3 === (514))) { */ case 19:
+						$r = p.parseImpliedToken(3, 209156, new atom.Atom(209156).String()); /* */ $s = 23; case 23: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$s = -1; return false;
+					/* } else if (_3 === (463880)) { */ case 20:
+						if (!(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).contains(463880)) {
+							$s = -1; return true;
+						}
+						p.generateImpliedEndTags(new sliceType([]));
+						i = p.oe.$length - 1 >> 0;
+						while (true) {
+							if (!(i >= 0)) { break; }
+							n = (x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i]));
+							if (n.Namespace === "" && (n.DataAtom === 463880)) {
+								p.oe = $subslice(p.oe, 0, i);
+								break;
+							}
+							i = i - (1) >> 0;
+						}
+						p.clearActiveFormattingElements();
+						(p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).pop();
+						p.resetInsertionMode();
+						$s = -1; return true;
+					/* } else { */ case 21:
+						$s = -1; return true;
+					/* } */ case 22:
+				case 17:
+				$s = 7; continue;
+			/* } else if (_1 === (5)) { */ case 5:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } else if (_1 === (6)) { */ case 6:
+				$s = -1; return true;
+			/* } */ case 7:
+		case 1:
+		$r = p.parseImpliedToken(3, 209156, new atom.Atom(209156).String()); /* */ $s = 24; case 24: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inHeadIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f._r$1 = _r$1; $f.i = i; $f.n = n; $f.p = p; $f.s = s; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	afterHeadIM = function(p) {
+		var _1, _2, _3, _r, _r$1, _r$2, _r$3, p, s, $s, $deferred, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; p = $f.p; s = $f.s; $s = $f.$s; $deferred = $f.$deferred; $r = $f.$r; } var $err = null; try { s: while (true) { switch ($s) { case 0: $deferred = []; $deferred.index = $curGoroutine.deferStack.length; $curGoroutine.deferStack.push($deferred);
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (2)) { $s = 3; continue; }
+			/* */ if (_1 === (3)) { $s = 4; continue; }
+			/* */ if (_1 === (5)) { $s = 5; continue; }
+			/* */ if (_1 === (6)) { $s = 6; continue; }
+			/* */ $s = 7; continue;
+			/* if (_1 === (1)) { */ case 2:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 8; case 8: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				if (s.length < p.tok.Data.length) {
+					p.addText($substring(p.tok.Data, 0, (p.tok.Data.length - s.length >> 0)));
+					if (s === "") {
+						$s = -1; return true;
+					}
+					p.tok.Data = s;
+				}
+				$s = 7; continue;
+			/* } else if (_1 === (2)) { */ case 3:
+					_2 = p.tok.DataAtom;
+					/* */ if (_2 === (22020)) { $s = 10; continue; }
+					/* */ if (_2 === (10244)) { $s = 11; continue; }
+					/* */ if (_2 === (35592)) { $s = 12; continue; }
+					/* */ if ((_2 === (15108)) || (_2 === (15112)) || (_2 === (89607)) || (_2 === (95236)) || (_2 === (309252)) || (_2 === (35080)) || (_2 === (137222)) || (_2 === (458501)) || (_2 === (463880)) || (_2 === (69637))) { $s = 13; continue; }
+					/* */ if (_2 === (209156)) { $s = 14; continue; }
+					/* */ $s = 15; continue;
+					/* if (_2 === (22020)) { */ case 10:
+						_r$1 = inBodyIM(p); /* */ $s = 16; case 16: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if (_2 === (10244)) { */ case 11:
+						p.addElement();
+						p.framesetOK = false;
+						p.im = inBodyIM;
+						$s = -1; return true;
+					/* } else if (_2 === (35592)) { */ case 12:
+						p.addElement();
+						p.im = inFramesetIM;
+						$s = -1; return true;
+					/* } else if ((_2 === (15108)) || (_2 === (15112)) || (_2 === (89607)) || (_2 === (95236)) || (_2 === (309252)) || (_2 === (35080)) || (_2 === (137222)) || (_2 === (458501)) || (_2 === (463880)) || (_2 === (69637))) { */ case 13:
+						p.oe = $append(p.oe, p.head);
+						$deferred.push([$methodVal((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))), "remove"), [p.head]]);
+						_r$2 = inHeadIM(p); /* */ $s = 17; case 17: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } else if (_2 === (209156)) { */ case 14:
+						$s = -1; return true;
+					/* } */ case 15:
+				case 9:
+				$s = 7; continue;
+			/* } else if (_1 === (3)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if ((_3 === (10244)) || (_3 === (22020)) || (_3 === (514))) { $s = 19; continue; }
+					/* */ if (_3 === (463880)) { $s = 20; continue; }
+					/* */ $s = 21; continue;
+					/* if ((_3 === (10244)) || (_3 === (22020)) || (_3 === (514))) { */ case 19:
+						$s = 22; continue;
+					/* } else if (_3 === (463880)) { */ case 20:
+						_r$3 = inHeadIM(p); /* */ $s = 23; case 23: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+						$s = -1; return _r$3;
+					/* } else { */ case 21:
+						$s = -1; return true;
+					/* } */ case 22:
+				case 18:
+				$s = 7; continue;
+			/* } else if (_1 === (5)) { */ case 5:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } else if (_1 === (6)) { */ case 6:
+				$s = -1; return true;
+			/* } */ case 7:
+		case 1:
+		$r = p.parseImpliedToken(2, 10244, new atom.Atom(10244).String()); /* */ $s = 24; case 24: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		p.framesetOK = true;
+		$s = -1; return false;
+		/* */ } return; } } catch(err) { $err = err; $s = -1; return false; } finally { $callDeferred($deferred, $err); if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: afterHeadIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f.p = p; $f.s = s; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
+	};
+	copyAttributes = function(dst, src) {
+		var _entry, _i, _i$1, _key, _key$1, _ref, _ref$1, _tuple, attr, dst, ok, src, t, t$1;
+		if (src.Attr.$length === 0) {
+			return;
+		}
+		attr = $makeMap($String.keyFor, []);
+		_ref = dst.Attr;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			t = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+			_key = t.Key; (attr || $throwRuntimeError("assignment to entry in nil map"))[$String.keyFor(_key)] = { k: _key, v: t.Val };
+			_i++;
+		}
+		_ref$1 = src.Attr;
+		_i$1 = 0;
+		while (true) {
+			if (!(_i$1 < _ref$1.$length)) { break; }
+			t$1 = $clone(((_i$1 < 0 || _i$1 >= _ref$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref$1.$array[_ref$1.$offset + _i$1]), Attribute);
+			_tuple = (_entry = attr[$String.keyFor(t$1.Key)], _entry !== undefined ? [_entry.v, true] : ["", false]);
+			ok = _tuple[1];
+			if (!ok) {
+				dst.Attr = $append(dst.Attr, t$1);
+				_key$1 = t$1.Key; (attr || $throwRuntimeError("assignment to entry in nil map"))[$String.keyFor(_key$1)] = { k: _key$1, v: t$1.Val };
+			}
+			_i$1++;
+		}
+	};
+	inBodyIM = function(p) {
+		var _1, _2, _3, _4, _5, _6, _7, _8, _9, _i, _i$1, _i$2, _r, _r$1, _r$2, _r$3, _ref, _ref$1, _ref$2, _v, action, attr, body, body$1, d, e, i, i$1, i$2, i$3, i$4, n, n$1, n$2, node, node$1, node$2, p, prompt, t, t$1, x, x$1, x$2, x$3, x$4, x$5, x$6, x$7, x$8, x$9, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _4 = $f._4; _5 = $f._5; _6 = $f._6; _7 = $f._7; _8 = $f._8; _9 = $f._9; _i = $f._i; _i$1 = $f._i$1; _i$2 = $f._i$2; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _ref = $f._ref; _ref$1 = $f._ref$1; _ref$2 = $f._ref$2; _v = $f._v; action = $f.action; attr = $f.attr; body = $f.body; body$1 = $f.body$1; d = $f.d; e = $f.e; i = $f.i; i$1 = $f.i$1; i$2 = $f.i$2; i$3 = $f.i$3; i$4 = $f.i$4; n = $f.n; n$1 = $f.n$1; n$2 = $f.n$2; node = $f.node; node$1 = $f.node$1; node$2 = $f.node$2; p = $f.p; prompt = $f.prompt; t = $f.t; t$1 = $f.t$1; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; x$3 = $f.x$3; x$4 = $f.x$4; x$5 = $f.x$5; x$6 = $f.x$6; x$7 = $f.x$7; x$8 = $f.x$8; x$9 = $f.x$9; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (2)) { $s = 3; continue; }
+			/* */ if (_1 === (3)) { $s = 4; continue; }
+			/* */ if (_1 === (5)) { $s = 5; continue; }
+			/* */ if (_1 === (0)) { $s = 6; continue; }
+			/* */ $s = 7; continue;
+			/* if (_1 === (1)) { */ case 2:
+				d = p.tok.Data;
+				n = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top();
+				_2 = n.DataAtom;
+				if ((_2 === (290819)) || (_2 === (305415))) {
+					if (n.FirstChild === ptrType.nil) {
+						if (!(d === "") && (d.charCodeAt(0) === 13)) {
+							d = $substring(d, 1);
+						}
+						if (!(d === "") && (d.charCodeAt(0) === 10)) {
+							d = $substring(d, 1);
+						}
+					}
+				}
+				d = strings.Replace(d, "\x00", "", -1);
+				if (d === "") {
+					$s = -1; return true;
+				}
+				p.reconstructActiveFormattingElements();
+				p.addText(d);
+				if (!(p.framesetOK)) { _v = false; $s = 10; continue s; }
+				_r = strings.TrimLeft(d, " \t\r\n\f"); /* */ $s = 11; case 11: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				_v = !(_r === ""); case 10:
+				/* */ if (_v) { $s = 8; continue; }
+				/* */ $s = 9; continue;
+				/* if (_v) { */ case 8:
+					p.framesetOK = false;
+				/* } */ case 9:
+				$s = 7; continue;
+			/* } else if (_1 === (2)) { */ case 3:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (22020)) { $s = 13; continue; }
+					/* */ if ((_3 === (15108)) || (_3 === (15112)) || (_3 === (89607)) || (_3 === (120583)) || (_3 === (95236)) || (_3 === (309252)) || (_3 === (35080)) || (_3 === (137222)) || (_3 === (458501)) || (_3 === (463880)) || (_3 === (69637))) { $s = 14; continue; }
+					/* */ if (_3 === (10244)) { $s = 15; continue; }
+					/* */ if (_3 === (35592)) { $s = 16; continue; }
+					/* */ if ((_3 === (455431)) || (_3 === (261127)) || (_3 === (67333)) || (_3 === (100106)) || (_3 === (139270)) || (_3 === (29191)) || (_3 === (37635)) || (_3 === (92931)) || (_3 === (386562)) || (_3 === (140808)) || (_3 === (142858)) || (_3 === (149510)) || (_3 === (62982)) || (_3 === (209158)) || (_3 === (182790)) || (_3 === (231172)) || (_3 === (4867)) || (_3 === (79618)) || (_3 === (3073)) || (_3 === (354311)) || (_3 === (459783)) || (_3 === (42754))) { $s = 17; continue; }
+					/* */ if ((_3 === (89090)) || (_3 === (187906)) || (_3 === (199938)) || (_3 === (214274)) || (_3 === (216834)) || (_3 === (412930))) { $s = 18; continue; }
+					/* */ if ((_3 === (290819)) || (_3 === (305415))) { $s = 19; continue; }
+					/* */ if (_3 === (159236)) { $s = 20; continue; }
+					/* */ if (_3 === (45570)) { $s = 21; continue; }
+					/* */ if ((_3 === (186114)) || (_3 === (412418))) { $s = 22; continue; }
+					/* */ if (_3 === (111113)) { $s = 23; continue; }
+					/* */ if (_3 === (102662)) { $s = 24; continue; }
+					/* */ if (_3 === (1)) { $s = 25; continue; }
+					/* */ if ((_3 === (257)) || (_3 === (94211)) || (_3 === (378116)) || (_3 === (28162)) || (_3 === (16132)) || (_3 === (1537)) || (_3 === (9473)) || (_3 === (132613)) || (_3 === (53766)) || (_3 === (449798)) || (_3 === (26626)) || (_3 === (2817))) { $s = 26; continue; }
+					/* */ if (_3 === (14084)) { $s = 27; continue; }
+					/* */ if ((_3 === (203014)) || (_3 === (206599)) || (_3 === (157702))) { $s = 28; continue; }
+					/* */ if (_3 === (365829)) { $s = 29; continue; }
+					/* */ if ((_3 === (218628)) || (_3 === (514)) || (_3 === (28165)) || (_3 === (198403)) || (_3 === (281349)) || (_3 === (12806)) || (_3 === (359427))) { $s = 30; continue; }
+					/* */ if ((_3 === (3077)) || (_3 === (227334)) || (_3 === (113157))) { $s = 31; continue; }
+					/* */ if (_3 === (87810)) { $s = 32; continue; }
+					/* */ if (_3 === (197125)) { $s = 33; continue; }
+					/* */ if (_3 === (200455)) { $s = 34; continue; }
+					/* */ if (_3 === (217608)) { $s = 35; continue; }
+					/* */ if (_3 === (77571)) { $s = 36; continue; }
+					/* */ if (_3 === (195590)) { $s = 37; continue; }
+					/* */ if ((_3 === (27655)) || (_3 === (136712))) { $s = 38; continue; }
+					/* */ if (_3 === (408582)) { $s = 39; continue; }
+					/* */ if ((_3 === (24328)) || (_3 === (451334))) { $s = 40; continue; }
+					/* */ if ((_3 === (14850)) || (_3 === (104963))) { $s = 41; continue; }
+					/* */ if ((_3 === (146434)) || (_3 === (104962))) { $s = 42; continue; }
+					/* */ if ((_3 === (208388)) || (_3 === (462339))) { $s = 43; continue; }
+					/* */ if ((_3 === (143623)) || (_3 === (109315)) || (_3 === (109320)) || (_3 === (35589)) || (_3 === (209156)) || (_3 === (9989)) || (_3 === (37378)) || (_3 === (62725)) || (_3 === (87554)) || (_3 === (208901)) || (_3 === (52226))) { $s = 44; continue; }
+					/* */ $s = 45; continue;
+					/* if (_3 === (22020)) { */ case 13:
+						if ((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).contains(463880)) {
+							$s = -1; return true;
+						}
+						copyAttributes((x = p.oe, (0 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 0])), $clone(p.tok, Token));
+						$s = 46; continue;
+					/* } else if ((_3 === (15108)) || (_3 === (15112)) || (_3 === (89607)) || (_3 === (120583)) || (_3 === (95236)) || (_3 === (309252)) || (_3 === (35080)) || (_3 === (137222)) || (_3 === (458501)) || (_3 === (463880)) || (_3 === (69637))) { */ case 14:
+						_r$1 = inHeadIM(p); /* */ $s = 47; case 47: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if (_3 === (10244)) { */ case 15:
+						if ((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).contains(463880)) {
+							$s = -1; return true;
+						}
+						if (p.oe.$length >= 2) {
+							body = (x$1 = p.oe, (1 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 1]));
+							if ((body.Type === 3) && (body.DataAtom === 10244)) {
+								p.framesetOK = false;
+								copyAttributes(body, $clone(p.tok, Token));
+							}
+						}
+						$s = 46; continue;
+					/* } else if (_3 === (35592)) { */ case 16:
+						if (!p.framesetOK || p.oe.$length < 2 || !(((x$2 = p.oe, (1 >= x$2.$length ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + 1])).DataAtom === 10244))) {
+							$s = -1; return true;
+						}
+						body$1 = (x$3 = p.oe, (1 >= x$3.$length ? ($throwRuntimeError("index out of range"), undefined) : x$3.$array[x$3.$offset + 1]));
+						if (!(body$1.Parent === ptrType.nil)) {
+							body$1.Parent.RemoveChild(body$1);
+						}
+						p.oe = $subslice(p.oe, 0, 1);
+						p.addElement();
+						p.im = inFramesetIM;
+						$s = -1; return true;
+					/* } else if ((_3 === (455431)) || (_3 === (261127)) || (_3 === (67333)) || (_3 === (100106)) || (_3 === (139270)) || (_3 === (29191)) || (_3 === (37635)) || (_3 === (92931)) || (_3 === (386562)) || (_3 === (140808)) || (_3 === (142858)) || (_3 === (149510)) || (_3 === (62982)) || (_3 === (209158)) || (_3 === (182790)) || (_3 === (231172)) || (_3 === (4867)) || (_3 === (79618)) || (_3 === (3073)) || (_3 === (354311)) || (_3 === (459783)) || (_3 === (42754))) { */ case 17:
+						p.popUntil(2, new sliceType$2([3073]));
+						p.addElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (89090)) || (_3 === (187906)) || (_3 === (199938)) || (_3 === (214274)) || (_3 === (216834)) || (_3 === (412930))) { */ case 18:
+						p.popUntil(2, new sliceType$2([3073]));
+						n$1 = p.top();
+						_4 = n$1.DataAtom;
+						if ((_4 === (89090)) || (_4 === (187906)) || (_4 === (199938)) || (_4 === (214274)) || (_4 === (216834)) || (_4 === (412930))) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						}
+						p.addElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (290819)) || (_3 === (305415))) { */ case 19:
+						p.popUntil(2, new sliceType$2([3073]));
+						p.addElement();
+						p.framesetOK = false;
+						$s = 46; continue;
+					/* } else if (_3 === (159236)) { */ case 20:
+						if (!(p.form === ptrType.nil) && !(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).contains(463880)) {
+							$s = -1; return true;
+						}
+						p.popUntil(2, new sliceType$2([3073]));
+						p.addElement();
+						if (!(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).contains(463880)) {
+							p.form = p.top();
+						}
+						$s = 46; continue;
+					/* } else if (_3 === (45570)) { */ case 21:
+						p.framesetOK = false;
+						i = p.oe.$length - 1 >> 0;
+						/* while (true) { */ case 48:
+							/* if (!(i >= 0)) { break; } */ if(!(i >= 0)) { $s = 49; continue; }
+							node = (x$4 = p.oe, ((i < 0 || i >= x$4.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$4.$array[x$4.$offset + i]));
+							_5 = node.DataAtom;
+							if (_5 === (45570)) {
+								p.oe = $subslice(p.oe, 0, i);
+							} else if ((_5 === (455431)) || (_5 === (92931)) || (_5 === (3073))) {
+								i = i - (1) >> 0;
+								/* continue; */ $s = 48; continue;
+							} else if (!isSpecialElement(node)) {
+								i = i - (1) >> 0;
+								/* continue; */ $s = 48; continue;
+							}
+							/* break; */ $s = 49; continue;
+						/* } */ $s = 48; continue; case 49:
+						p.popUntil(2, new sliceType$2([3073]));
+						p.addElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (186114)) || (_3 === (412418))) { */ case 22:
+						p.framesetOK = false;
+						i$1 = p.oe.$length - 1 >> 0;
+						/* while (true) { */ case 50:
+							/* if (!(i$1 >= 0)) { break; } */ if(!(i$1 >= 0)) { $s = 51; continue; }
+							node$1 = (x$5 = p.oe, ((i$1 < 0 || i$1 >= x$5.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$5.$array[x$5.$offset + i$1]));
+							_6 = node$1.DataAtom;
+							if ((_6 === (186114)) || (_6 === (412418))) {
+								p.oe = $subslice(p.oe, 0, i$1);
+							} else if ((_6 === (455431)) || (_6 === (92931)) || (_6 === (3073))) {
+								i$1 = i$1 - (1) >> 0;
+								/* continue; */ $s = 50; continue;
+							} else if (!isSpecialElement(node$1)) {
+								i$1 = i$1 - (1) >> 0;
+								/* continue; */ $s = 50; continue;
+							}
+							/* break; */ $s = 51; continue;
+						/* } */ $s = 50; continue; case 51:
+						p.popUntil(2, new sliceType$2([3073]));
+						p.addElement();
+						$s = 46; continue;
+					/* } else if (_3 === (111113)) { */ case 23:
+						p.popUntil(2, new sliceType$2([3073]));
+						p.addElement();
+						$s = 46; continue;
+					/* } else if (_3 === (102662)) { */ case 24:
+						p.popUntil(0, new sliceType$2([102662]));
+						p.reconstructActiveFormattingElements();
+						p.addElement();
+						p.framesetOK = false;
+						$s = 46; continue;
+					/* } else if (_3 === (1)) { */ case 25:
+						i$2 = p.afe.$length - 1 >> 0;
+						while (true) {
+							if (!(i$2 >= 0 && !(((x$6 = p.afe, ((i$2 < 0 || i$2 >= x$6.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$6.$array[x$6.$offset + i$2])).Type === 6)))) { break; }
+							n$2 = (x$7 = p.afe, ((i$2 < 0 || i$2 >= x$7.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$7.$array[x$7.$offset + i$2]));
+							if ((n$2.Type === 3) && (n$2.DataAtom === 1)) {
+								p.inBodyEndTagFormatting(1);
+								(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).remove(n$2);
+								(p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).remove(n$2);
+								break;
+							}
+							i$2 = i$2 - (1) >> 0;
+						}
+						p.reconstructActiveFormattingElements();
+						p.addFormattingElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (257)) || (_3 === (94211)) || (_3 === (378116)) || (_3 === (28162)) || (_3 === (16132)) || (_3 === (1537)) || (_3 === (9473)) || (_3 === (132613)) || (_3 === (53766)) || (_3 === (449798)) || (_3 === (26626)) || (_3 === (2817))) { */ case 26:
+						p.reconstructActiveFormattingElements();
+						p.addFormattingElement();
+						$s = 46; continue;
+					/* } else if (_3 === (14084)) { */ case 27:
+						p.reconstructActiveFormattingElements();
+						if (p.elementInScope(0, new sliceType$2([14084]))) {
+							p.inBodyEndTagFormatting(14084);
+							p.reconstructActiveFormattingElements();
+						}
+						p.addFormattingElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (203014)) || (_3 === (206599)) || (_3 === (157702))) { */ case 28:
+						p.reconstructActiveFormattingElements();
+						p.addElement();
+						p.afe = $append(p.afe, scopeMarker);
+						p.framesetOK = false;
+						$s = 46; continue;
+					/* } else if (_3 === (365829)) { */ case 29:
+						if (!p.quirks) {
+							p.popUntil(2, new sliceType$2([3073]));
+						}
+						p.addElement();
+						p.framesetOK = false;
+						p.im = inTableIM;
+						$s = -1; return true;
+					/* } else if ((_3 === (218628)) || (_3 === (514)) || (_3 === (28165)) || (_3 === (198403)) || (_3 === (281349)) || (_3 === (12806)) || (_3 === (359427))) { */ case 30:
+						p.reconstructActiveFormattingElements();
+						p.addElement();
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.acknowledgeSelfClosingTag();
+						/* */ if (p.tok.DataAtom === 281349) { $s = 52; continue; }
+						/* */ $s = 53; continue;
+						/* if (p.tok.DataAtom === 281349) { */ case 52:
+							_ref = p.tok.Attr;
+							_i = 0;
+							/* while (true) { */ case 54:
+								/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 55; continue; }
+								t = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+								/* */ if (t.Key === "type") { $s = 56; continue; }
+								/* */ $s = 57; continue;
+								/* if (t.Key === "type") { */ case 56:
+									_r$2 = strings.ToLower(t.Val); /* */ $s = 60; case 60: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+									/* */ if (_r$2 === "hidden") { $s = 58; continue; }
+									/* */ $s = 59; continue;
+									/* if (_r$2 === "hidden") { */ case 58:
+										$s = -1; return true;
+									/* } */ case 59:
+								/* } */ case 57:
+								_i++;
+							/* } */ $s = 54; continue; case 55:
+						/* } */ case 53:
+						p.framesetOK = false;
+						$s = 46; continue;
+					/* } else if ((_3 === (3077)) || (_3 === (227334)) || (_3 === (113157))) { */ case 31:
+						p.addElement();
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.acknowledgeSelfClosingTag();
+						$s = 46; continue;
+					/* } else if (_3 === (87810)) { */ case 32:
+						p.popUntil(2, new sliceType$2([3073]));
+						p.addElement();
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.acknowledgeSelfClosingTag();
+						p.framesetOK = false;
+						$s = 46; continue;
+					/* } else if (_3 === (197125)) { */ case 33:
+						p.tok.DataAtom = 198403;
+						p.tok.Data = new atom.Atom(198403).String();
+						$s = -1; return false;
+					/* } else if (_3 === (200455)) { */ case 34:
+						if (!(p.form === ptrType.nil)) {
+							$s = -1; return true;
+						}
+						action = "";
+						prompt = "This is a searchable index. Enter search keywords: ";
+						attr = new sliceType$1([new Attribute.ptr("", "name", "isindex")]);
+						_ref$1 = p.tok.Attr;
+						_i$1 = 0;
+						while (true) {
+							if (!(_i$1 < _ref$1.$length)) { break; }
+							t$1 = $clone(((_i$1 < 0 || _i$1 >= _ref$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref$1.$array[_ref$1.$offset + _i$1]), Attribute);
+							_7 = t$1.Key;
+							if (_7 === ("action")) {
+								action = t$1.Val;
+							} else if (_7 === ("name")) {
+							} else if (_7 === ("prompt")) {
+								prompt = t$1.Val;
+							} else {
+								attr = $append(attr, t$1);
+							}
+							_i$1++;
+						}
+						p.acknowledgeSelfClosingTag();
+						p.popUntil(2, new sliceType$2([3073]));
+						$r = p.parseImpliedToken(2, 159236, new atom.Atom(159236).String()); /* */ $s = 61; case 61: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						if (!(action === "")) {
+							p.form.Attr = new sliceType$1([new Attribute.ptr("", "action", action)]);
+						}
+						$r = p.parseImpliedToken(2, 87810, new atom.Atom(87810).String()); /* */ $s = 62; case 62: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$r = p.parseImpliedToken(2, 22789, new atom.Atom(22789).String()); /* */ $s = 63; case 63: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						p.addText(prompt);
+						p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 3, 281349, new atom.Atom(281349).String(), "", attr));
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						$r = p.parseImpliedToken(3, 22789, new atom.Atom(22789).String()); /* */ $s = 64; case 64: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$r = p.parseImpliedToken(2, 87810, new atom.Atom(87810).String()); /* */ $s = 65; case 65: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$r = p.parseImpliedToken(3, 159236, new atom.Atom(159236).String()); /* */ $s = 66; case 66: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$s = 46; continue;
+					/* } else if (_3 === (217608)) { */ case 35:
+						p.addElement();
+						p.setOriginalIM();
+						p.framesetOK = false;
+						p.im = textIM;
+						$s = 46; continue;
+					/* } else if (_3 === (77571)) { */ case 36:
+						p.popUntil(2, new sliceType$2([3073]));
+						p.reconstructActiveFormattingElements();
+						p.framesetOK = false;
+						p.addElement();
+						p.setOriginalIM();
+						p.im = textIM;
+						$s = 46; continue;
+					/* } else if (_3 === (195590)) { */ case 37:
+						p.framesetOK = false;
+						p.addElement();
+						p.setOriginalIM();
+						p.im = textIM;
+						$s = 46; continue;
+					/* } else if ((_3 === (27655)) || (_3 === (136712))) { */ case 38:
+						p.addElement();
+						p.setOriginalIM();
+						p.im = textIM;
+						$s = 46; continue;
+					/* } else if (_3 === (408582)) { */ case 39:
+						p.reconstructActiveFormattingElements();
+						p.addElement();
+						p.framesetOK = false;
+						p.im = inSelectIM;
+						$s = -1; return true;
+					/* } else if ((_3 === (24328)) || (_3 === (451334))) { */ case 40:
+						if (p.top().DataAtom === 451334) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						}
+						p.reconstructActiveFormattingElements();
+						p.addElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (14850)) || (_3 === (104963))) { */ case 41:
+						if (p.elementInScope(0, new sliceType$2([64260]))) {
+							p.generateImpliedEndTags(new sliceType([]));
+						}
+						p.addElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (146434)) || (_3 === (104962))) { */ case 42:
+						if (p.elementInScope(0, new sliceType$2([64260]))) {
+							p.generateImpliedEndTags(new sliceType(["rtc"]));
+						}
+						p.addElement();
+						$s = 46; continue;
+					/* } else if ((_3 === (208388)) || (_3 === (462339))) { */ case 43:
+						p.reconstructActiveFormattingElements();
+						if (p.tok.DataAtom === 208388) {
+							adjustAttributeNames(p.tok.Attr, mathMLAttributeAdjustments);
+						} else {
+							adjustAttributeNames(p.tok.Attr, svgAttributeAdjustments);
+						}
+						adjustForeignAttributes(p.tok.Attr);
+						p.addElement();
+						p.top().Namespace = p.tok.Data;
+						if (p.hasSelfClosingToken) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+							p.acknowledgeSelfClosingTag();
+						}
+						$s = -1; return true;
+					/* } else if ((_3 === (143623)) || (_3 === (109315)) || (_3 === (109320)) || (_3 === (35589)) || (_3 === (209156)) || (_3 === (9989)) || (_3 === (37378)) || (_3 === (62725)) || (_3 === (87554)) || (_3 === (208901)) || (_3 === (52226))) { */ case 44:
+						$s = 46; continue;
+					/* } else { */ case 45:
+						p.reconstructActiveFormattingElements();
+						p.addElement();
+					/* } */ case 46:
+				case 12:
+				$s = 7; continue;
+			/* } else if (_1 === (3)) { */ case 4:
+					_8 = p.tok.DataAtom;
+					/* */ if (_8 === (10244)) { $s = 68; continue; }
+					/* */ if (_8 === (22020)) { $s = 69; continue; }
+					/* */ if ((_8 === (455431)) || (_8 === (261127)) || (_8 === (67333)) || (_8 === (100106)) || (_8 === (102662)) || (_8 === (139270)) || (_8 === (29191)) || (_8 === (37635)) || (_8 === (92931)) || (_8 === (386562)) || (_8 === (140808)) || (_8 === (142858)) || (_8 === (149510)) || (_8 === (62982)) || (_8 === (209158)) || (_8 === (182790)) || (_8 === (305415)) || (_8 === (231172)) || (_8 === (4867)) || (_8 === (79618)) || (_8 === (290819)) || (_8 === (354311)) || (_8 === (459783)) || (_8 === (42754))) { $s = 70; continue; }
+					/* */ if (_8 === (159236)) { $s = 71; continue; }
+					/* */ if (_8 === (3073)) { $s = 72; continue; }
+					/* */ if (_8 === (45570)) { $s = 73; continue; }
+					/* */ if ((_8 === (186114)) || (_8 === (412418))) { $s = 74; continue; }
+					/* */ if ((_8 === (89090)) || (_8 === (187906)) || (_8 === (199938)) || (_8 === (214274)) || (_8 === (216834)) || (_8 === (412930))) { $s = 75; continue; }
+					/* */ if ((_8 === (1)) || (_8 === (257)) || (_8 === (94211)) || (_8 === (378116)) || (_8 === (28162)) || (_8 === (16132)) || (_8 === (1537)) || (_8 === (14084)) || (_8 === (9473)) || (_8 === (132613)) || (_8 === (53766)) || (_8 === (449798)) || (_8 === (26626)) || (_8 === (2817))) { $s = 76; continue; }
+					/* */ if ((_8 === (203014)) || (_8 === (206599)) || (_8 === (157702))) { $s = 77; continue; }
+					/* */ if (_8 === (514)) { $s = 78; continue; }
+					/* */ if (_8 === (463880)) { $s = 79; continue; }
+					/* */ $s = 80; continue;
+					/* if (_8 === (10244)) { */ case 68:
+						if (p.elementInScope(0, new sliceType$2([10244]))) {
+							p.im = afterBodyIM;
+						}
+						$s = 81; continue;
+					/* } else if (_8 === (22020)) { */ case 69:
+						/* */ if (p.elementInScope(0, new sliceType$2([10244]))) { $s = 82; continue; }
+						/* */ $s = 83; continue;
+						/* if (p.elementInScope(0, new sliceType$2([10244]))) { */ case 82:
+							$r = p.parseImpliedToken(3, 10244, new atom.Atom(10244).String()); /* */ $s = 84; case 84: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+							$s = -1; return false;
+						/* } */ case 83:
+						$s = -1; return true;
+					/* } else if ((_8 === (455431)) || (_8 === (261127)) || (_8 === (67333)) || (_8 === (100106)) || (_8 === (102662)) || (_8 === (139270)) || (_8 === (29191)) || (_8 === (37635)) || (_8 === (92931)) || (_8 === (386562)) || (_8 === (140808)) || (_8 === (142858)) || (_8 === (149510)) || (_8 === (62982)) || (_8 === (209158)) || (_8 === (182790)) || (_8 === (305415)) || (_8 === (231172)) || (_8 === (4867)) || (_8 === (79618)) || (_8 === (290819)) || (_8 === (354311)) || (_8 === (459783)) || (_8 === (42754))) { */ case 70:
+						p.popUntil(0, new sliceType$2([p.tok.DataAtom]));
+						$s = 81; continue;
+					/* } else if (_8 === (159236)) { */ case 71:
+						if ((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).contains(463880)) {
+							i$3 = p.indexOfElementInScope(0, new sliceType$2([159236]));
+							if (i$3 === -1) {
+								$s = -1; return true;
+							}
+							p.generateImpliedEndTags(new sliceType([]));
+							if (!(((x$8 = p.oe, ((i$3 < 0 || i$3 >= x$8.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$8.$array[x$8.$offset + i$3])).DataAtom === 159236))) {
+								$s = -1; return true;
+							}
+							p.popUntil(0, new sliceType$2([159236]));
+						} else {
+							node$2 = p.form;
+							p.form = ptrType.nil;
+							i$4 = p.indexOfElementInScope(0, new sliceType$2([159236]));
+							if (node$2 === ptrType.nil || (i$4 === -1) || !((x$9 = p.oe, ((i$4 < 0 || i$4 >= x$9.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$9.$array[x$9.$offset + i$4])) === node$2)) {
+								$s = -1; return true;
+							}
+							p.generateImpliedEndTags(new sliceType([]));
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).remove(node$2);
+						}
+						$s = 81; continue;
+					/* } else if (_8 === (3073)) { */ case 72:
+						/* */ if (!p.elementInScope(2, new sliceType$2([3073]))) { $s = 85; continue; }
+						/* */ $s = 86; continue;
+						/* if (!p.elementInScope(2, new sliceType$2([3073]))) { */ case 85:
+							$r = p.parseImpliedToken(2, 3073, new atom.Atom(3073).String()); /* */ $s = 87; case 87: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						/* } */ case 86:
+						p.popUntil(2, new sliceType$2([3073]));
+						$s = 81; continue;
+					/* } else if (_8 === (45570)) { */ case 73:
+						p.popUntil(1, new sliceType$2([45570]));
+						$s = 81; continue;
+					/* } else if ((_8 === (186114)) || (_8 === (412418))) { */ case 74:
+						p.popUntil(0, new sliceType$2([p.tok.DataAtom]));
+						$s = 81; continue;
+					/* } else if ((_8 === (89090)) || (_8 === (187906)) || (_8 === (199938)) || (_8 === (214274)) || (_8 === (216834)) || (_8 === (412930))) { */ case 75:
+						p.popUntil(0, new sliceType$2([89090, 187906, 199938, 214274, 216834, 412930]));
+						$s = 81; continue;
+					/* } else if ((_8 === (1)) || (_8 === (257)) || (_8 === (94211)) || (_8 === (378116)) || (_8 === (28162)) || (_8 === (16132)) || (_8 === (1537)) || (_8 === (14084)) || (_8 === (9473)) || (_8 === (132613)) || (_8 === (53766)) || (_8 === (449798)) || (_8 === (26626)) || (_8 === (2817))) { */ case 76:
+						p.inBodyEndTagFormatting(p.tok.DataAtom);
+						$s = 81; continue;
+					/* } else if ((_8 === (203014)) || (_8 === (206599)) || (_8 === (157702))) { */ case 77:
+						if (p.popUntil(0, new sliceType$2([p.tok.DataAtom]))) {
+							p.clearActiveFormattingElements();
+						}
+						$s = 81; continue;
+					/* } else if (_8 === (514)) { */ case 78:
+						p.tok.Type = 2;
+						$s = -1; return false;
+					/* } else if (_8 === (463880)) { */ case 79:
+						_r$3 = inHeadIM(p); /* */ $s = 88; case 88: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+						$s = -1; return _r$3;
+					/* } else { */ case 80:
+						p.inBodyEndTagOther(p.tok.DataAtom);
+					/* } */ case 81:
+				case 67:
+				$s = 7; continue;
+			/* } else if (_1 === (5)) { */ case 5:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = 7; continue;
+			/* } else if (_1 === (0)) { */ case 6:
+				if (p.templateStack.$length > 0) {
+					p.im = inTemplateIM;
+					$s = -1; return false;
+				} else {
+					_ref$2 = p.oe;
+					_i$2 = 0;
+					while (true) {
+						if (!(_i$2 < _ref$2.$length)) { break; }
+						e = ((_i$2 < 0 || _i$2 >= _ref$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref$2.$array[_ref$2.$offset + _i$2]);
+						_9 = e.DataAtom;
+						if ((_9 === (186114)) || (_9 === (412418)) || (_9 === (45570)) || (_9 === (24328)) || (_9 === (451334)) || (_9 === (3073)) || (_9 === (14850)) || (_9 === (146434)) || (_9 === (104962)) || (_9 === (104963)) || (_9 === (9989)) || (_9 === (37378)) || (_9 === (62725)) || (_9 === (87554)) || (_9 === (208901)) || (_9 === (52226)) || (_9 === (10244)) || (_9 === (22020))) {
+						} else {
+							$s = -1; return true;
+						}
+						_i$2++;
+					}
+				}
+			/* } */ case 7:
+		case 1:
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inBodyIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._4 = _4; $f._5 = _5; $f._6 = _6; $f._7 = _7; $f._8 = _8; $f._9 = _9; $f._i = _i; $f._i$1 = _i$1; $f._i$2 = _i$2; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._ref = _ref; $f._ref$1 = _ref$1; $f._ref$2 = _ref$2; $f._v = _v; $f.action = action; $f.attr = attr; $f.body = body; $f.body$1 = body$1; $f.d = d; $f.e = e; $f.i = i; $f.i$1 = i$1; $f.i$2 = i$2; $f.i$3 = i$3; $f.i$4 = i$4; $f.n = n; $f.n$1 = n$1; $f.n$2 = n$2; $f.node = node; $f.node$1 = node$1; $f.node$2 = node$2; $f.p = p; $f.prompt = prompt; $f.t = t; $f.t$1 = t$1; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.x$4 = x$4; $f.x$5 = x$5; $f.x$6 = x$6; $f.x$7 = x$7; $f.x$8 = x$8; $f.x$9 = x$9; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	parser.ptr.prototype.inBodyEndTagFormatting = function(tagAtom) {
+		var _1, _i, _ref, bookmark, clone, clone$1, commonAncestor, e, e$1, feIndex, formattingElement, furthestBlock, i, j, j$1, lastNode, node, oldLoc, p, tagAtom, x, x$1, x$10, x$2, x$3, x$4, x$5, x$6, x$7, x$8, x$9;
+		p = this;
+		i = 0;
+		while (true) {
+			if (!(i < 8)) { break; }
+			formattingElement = ptrType.nil;
+			j = p.afe.$length - 1 >> 0;
+			while (true) {
+				if (!(j >= 0)) { break; }
+				if ((x = p.afe, ((j < 0 || j >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + j])).Type === 6) {
+					break;
+				}
+				if ((x$1 = p.afe, ((j < 0 || j >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + j])).DataAtom === tagAtom) {
+					formattingElement = (x$2 = p.afe, ((j < 0 || j >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + j]));
+					break;
+				}
+				j = j - (1) >> 0;
+			}
+			if (formattingElement === ptrType.nil) {
+				p.inBodyEndTagOther(tagAtom);
+				return;
+			}
+			feIndex = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).index(formattingElement);
+			if (feIndex === -1) {
+				(p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).remove(formattingElement);
+				return;
+			}
+			if (!p.elementInScope(0, new sliceType$2([tagAtom]))) {
+				return;
+			}
+			furthestBlock = ptrType.nil;
+			_ref = $subslice(p.oe, feIndex);
+			_i = 0;
+			while (true) {
+				if (!(_i < _ref.$length)) { break; }
+				e = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+				if (isSpecialElement(e)) {
+					furthestBlock = e;
+					break;
+				}
+				_i++;
+			}
+			if (furthestBlock === ptrType.nil) {
+				e$1 = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+				while (true) {
+					if (!(!(e$1 === formattingElement))) { break; }
+					e$1 = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+				}
+				(p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).remove(e$1);
+				return;
+			}
+			commonAncestor = (x$3 = p.oe, x$4 = feIndex - 1 >> 0, ((x$4 < 0 || x$4 >= x$3.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$3.$array[x$3.$offset + x$4]));
+			bookmark = (p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).index(formattingElement);
+			lastNode = furthestBlock;
+			node = furthestBlock;
+			x$5 = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).index(node);
+			j$1 = 0;
+			while (true) {
+				if (!(j$1 < 3)) { break; }
+				x$5 = x$5 - (1) >> 0;
+				node = (x$6 = p.oe, ((x$5 < 0 || x$5 >= x$6.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$6.$array[x$6.$offset + x$5]));
+				if ((p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).index(node) === -1) {
+					(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).remove(node);
+					j$1 = j$1 + (1) >> 0;
+					continue;
+				}
+				if (node === formattingElement) {
+					break;
+				}
+				clone = node.clone();
+				(x$7 = p.afe, x$8 = (p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).index(node), ((x$8 < 0 || x$8 >= x$7.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$7.$array[x$7.$offset + x$8] = clone));
+				(x$9 = p.oe, x$10 = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).index(node), ((x$10 < 0 || x$10 >= x$9.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$9.$array[x$9.$offset + x$10] = clone));
+				node = clone;
+				if (lastNode === furthestBlock) {
+					bookmark = (p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).index(node) + 1 >> 0;
+				}
+				if (!(lastNode.Parent === ptrType.nil)) {
+					lastNode.Parent.RemoveChild(lastNode);
+				}
+				node.AppendChild(lastNode);
+				lastNode = node;
+				j$1 = j$1 + (1) >> 0;
+			}
+			if (!(lastNode.Parent === ptrType.nil)) {
+				lastNode.Parent.RemoveChild(lastNode);
+			}
+			_1 = commonAncestor.DataAtom;
+			if ((_1 === (365829)) || (_1 === (9989)) || (_1 === (62725)) || (_1 === (208901)) || (_1 === (52226))) {
+				p.fosterParent(lastNode);
+			} else if (_1 === (463880)) {
+				if (commonAncestor.Namespace === "html") {
+					commonAncestor = commonAncestor.LastChild;
+				}
+				commonAncestor.AppendChild(lastNode);
+			} else {
+				commonAncestor.AppendChild(lastNode);
+			}
+			clone$1 = formattingElement.clone();
+			reparentChildren(clone$1, furthestBlock);
+			furthestBlock.AppendChild(clone$1);
+			oldLoc = (p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).index(formattingElement);
+			if (!((oldLoc === -1)) && oldLoc < bookmark) {
+				bookmark = bookmark - (1) >> 0;
+			}
+			(p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).remove(formattingElement);
+			(p.$ptr_afe || (p.$ptr_afe = new ptrType$1(function() { return this.$target.afe; }, function($v) { this.$target.afe = $v; }, p))).insert(bookmark, clone$1);
+			(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).remove(formattingElement);
+			(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).insert((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).index(furthestBlock) + 1 >> 0, clone$1);
+			i = i + (1) >> 0;
+		}
+	};
+	parser.prototype.inBodyEndTagFormatting = function(tagAtom) { return this.$val.inBodyEndTagFormatting(tagAtom); };
+	parser.ptr.prototype.inBodyEndTagOther = function(tagAtom) {
+		var i, p, tagAtom, x, x$1;
+		p = this;
+		i = p.oe.$length - 1 >> 0;
+		while (true) {
+			if (!(i >= 0)) { break; }
+			if ((x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i])).DataAtom === tagAtom) {
+				p.oe = $subslice(p.oe, 0, i);
+				break;
+			}
+			if (isSpecialElement((x$1 = p.oe, ((i < 0 || i >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + i])))) {
+				break;
+			}
+			i = i - (1) >> 0;
+		}
+	};
+	parser.prototype.inBodyEndTagOther = function(tagAtom) { return this.$val.inBodyEndTagOther(tagAtom); };
+	textIM = function(p) {
+		var _1, d, n, p;
+		_1 = p.tok.Type;
+		if (_1 === (0)) {
+			(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+		} else if (_1 === (1)) {
+			d = p.tok.Data;
+			n = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top();
+			if ((n.DataAtom === 217608) && n.FirstChild === ptrType.nil) {
+				if (!(d === "") && (d.charCodeAt(0) === 13)) {
+					d = $substring(d, 1);
+				}
+				if (!(d === "") && (d.charCodeAt(0) === 10)) {
+					d = $substring(d, 1);
+				}
+			}
+			if (d === "") {
+				return true;
+			}
+			p.addText(d);
+			return true;
+		} else if (_1 === (3)) {
+			(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+		}
+		p.im = p.originalIM;
+		p.originalIM = $throwNilPointerError;
+		return p.tok.Type === 3;
+	};
+	inTableIM = function(p) {
+		var _1, _2, _3, _4, _5, _i, _r, _r$1, _r$2, _r$3, _r$4, _r$5, _ref, _v, p, t, $s, $deferred, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _4 = $f._4; _5 = $f._5; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _r$4 = $f._r$4; _r$5 = $f._r$5; _ref = $f._ref; _v = $f._v; p = $f.p; t = $f.t; $s = $f.$s; $deferred = $f.$deferred; $r = $f.$r; } var $err = null; try { s: while (true) { switch ($s) { case 0: $deferred = []; $deferred.index = $curGoroutine.deferStack.length; $curGoroutine.deferStack.push($deferred);
+		p = [p];
+			_1 = p[0].tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (2)) { $s = 3; continue; }
+			/* */ if (_1 === (3)) { $s = 4; continue; }
+			/* */ if (_1 === (5)) { $s = 5; continue; }
+			/* */ if (_1 === (6)) { $s = 6; continue; }
+			/* */ if (_1 === (0)) { $s = 7; continue; }
+			/* */ $s = 8; continue;
+			/* if (_1 === (1)) { */ case 2:
+				p[0].tok.Data = strings.Replace(p[0].tok.Data, "\x00", "", -1);
+					_2 = (p[0].$ptr_oe || (p[0].$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p[0]))).top().DataAtom;
+					/* */ if ((_2 === (365829)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901)) || (_2 === (52226))) { $s = 10; continue; }
+					/* */ $s = 11; continue;
+					/* if ((_2 === (365829)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901)) || (_2 === (52226))) { */ case 10:
+						_r = strings.Trim(p[0].tok.Data, " \t\r\n\f"); /* */ $s = 14; case 14: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+						/* */ if (_r === "") { $s = 12; continue; }
+						/* */ $s = 13; continue;
+						/* if (_r === "") { */ case 12:
+							p[0].addText(p[0].tok.Data);
+							$s = -1; return true;
+						/* } */ case 13:
+					/* } */ case 11:
+				case 9:
+				$s = 8; continue;
+			/* } else if (_1 === (2)) { */ case 3:
+					_3 = p[0].tok.DataAtom;
+					/* */ if (_3 === (143623)) { $s = 16; continue; }
+					/* */ if (_3 === (109320)) { $s = 17; continue; }
+					/* */ if (_3 === (109315)) { $s = 18; continue; }
+					/* */ if ((_3 === (9989)) || (_3 === (62725)) || (_3 === (208901))) { $s = 19; continue; }
+					/* */ if ((_3 === (37378)) || (_3 === (87554)) || (_3 === (52226))) { $s = 20; continue; }
+					/* */ if (_3 === (365829)) { $s = 21; continue; }
+					/* */ if ((_3 === (458501)) || (_3 === (137222)) || (_3 === (463880))) { $s = 22; continue; }
+					/* */ if (_3 === (281349)) { $s = 23; continue; }
+					/* */ if (_3 === (159236)) { $s = 24; continue; }
+					/* */ if (_3 === (408582)) { $s = 25; continue; }
+					/* */ $s = 26; continue;
+					/* if (_3 === (143623)) { */ case 16:
+						p[0].clearStackToContext(3);
+						p[0].afe = $append(p[0].afe, scopeMarker);
+						p[0].addElement();
+						p[0].im = inCaptionIM;
+						$s = -1; return true;
+					/* } else if (_3 === (109320)) { */ case 17:
+						p[0].clearStackToContext(3);
+						p[0].addElement();
+						p[0].im = inColumnGroupIM;
+						$s = -1; return true;
+					/* } else if (_3 === (109315)) { */ case 18:
+						$r = p[0].parseImpliedToken(2, 109320, new atom.Atom(109320).String()); /* */ $s = 27; case 27: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$s = -1; return false;
+					/* } else if ((_3 === (9989)) || (_3 === (62725)) || (_3 === (208901))) { */ case 19:
+						p[0].clearStackToContext(3);
+						p[0].addElement();
+						p[0].im = inTableBodyIM;
+						$s = -1; return true;
+					/* } else if ((_3 === (37378)) || (_3 === (87554)) || (_3 === (52226))) { */ case 20:
+						$r = p[0].parseImpliedToken(2, 9989, new atom.Atom(9989).String()); /* */ $s = 28; case 28: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$s = -1; return false;
+					/* } else if (_3 === (365829)) { */ case 21:
+						if (p[0].popUntil(3, new sliceType$2([365829]))) {
+							p[0].resetInsertionMode();
+							$s = -1; return false;
+						}
+						$s = -1; return true;
+					/* } else if ((_3 === (458501)) || (_3 === (137222)) || (_3 === (463880))) { */ case 22:
+						_r$1 = inHeadIM(p[0]); /* */ $s = 29; case 29: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if (_3 === (281349)) { */ case 23:
+						_ref = p[0].tok.Attr;
+						_i = 0;
+						/* while (true) { */ case 30:
+							/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 31; continue; }
+							t = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+							if (!(t.Key === "type")) { _v = false; $s = 34; continue s; }
+							_r$2 = strings.ToLower(t.Val); /* */ $s = 35; case 35: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+							_v = _r$2 === "hidden"; case 34:
+							/* */ if (_v) { $s = 32; continue; }
+							/* */ $s = 33; continue;
+							/* if (_v) { */ case 32:
+								p[0].addElement();
+								(p[0].$ptr_oe || (p[0].$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p[0]))).pop();
+								$s = -1; return true;
+							/* } */ case 33:
+							_i++;
+						/* } */ $s = 30; continue; case 31:
+						$s = 26; continue;
+					/* } else if (_3 === (159236)) { */ case 24:
+						if ((p[0].$ptr_oe || (p[0].$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p[0]))).contains(463880) || !(p[0].form === ptrType.nil)) {
+							$s = -1; return true;
+						}
+						p[0].addElement();
+						p[0].form = (p[0].$ptr_oe || (p[0].$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p[0]))).pop();
+						$s = 26; continue;
+					/* } else if (_3 === (408582)) { */ case 25:
+						p[0].reconstructActiveFormattingElements();
+						_4 = p[0].top().DataAtom;
+						if ((_4 === (365829)) || (_4 === (9989)) || (_4 === (62725)) || (_4 === (208901)) || (_4 === (52226))) {
+							p[0].fosterParenting = true;
+						}
+						p[0].addElement();
+						p[0].fosterParenting = false;
+						p[0].framesetOK = false;
+						p[0].im = inSelectInTableIM;
+						$s = -1; return true;
+					/* } */ case 26:
+				case 15:
+				$s = 8; continue;
+			/* } else if (_1 === (3)) { */ case 4:
+					_5 = p[0].tok.DataAtom;
+					/* */ if (_5 === (365829)) { $s = 37; continue; }
+					/* */ if ((_5 === (10244)) || (_5 === (143623)) || (_5 === (109315)) || (_5 === (109320)) || (_5 === (22020)) || (_5 === (9989)) || (_5 === (37378)) || (_5 === (62725)) || (_5 === (87554)) || (_5 === (208901)) || (_5 === (52226))) { $s = 38; continue; }
+					/* */ if (_5 === (463880)) { $s = 39; continue; }
+					/* */ $s = 40; continue;
+					/* if (_5 === (365829)) { */ case 37:
+						if (p[0].popUntil(3, new sliceType$2([365829]))) {
+							p[0].resetInsertionMode();
+							$s = -1; return true;
+						}
+						$s = -1; return true;
+					/* } else if ((_5 === (10244)) || (_5 === (143623)) || (_5 === (109315)) || (_5 === (109320)) || (_5 === (22020)) || (_5 === (9989)) || (_5 === (37378)) || (_5 === (62725)) || (_5 === (87554)) || (_5 === (208901)) || (_5 === (52226))) { */ case 38:
+						$s = -1; return true;
+					/* } else if (_5 === (463880)) { */ case 39:
+						_r$3 = inHeadIM(p[0]); /* */ $s = 41; case 41: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+						$s = -1; return _r$3;
+					/* } */ case 40:
+				case 36:
+				$s = 8; continue;
+			/* } else if (_1 === (5)) { */ case 5:
+				p[0].addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p[0].tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } else if (_1 === (6)) { */ case 6:
+				$s = -1; return true;
+			/* } else if (_1 === (0)) { */ case 7:
+				_r$4 = inBodyIM(p[0]); /* */ $s = 42; case 42: if($c) { $c = false; _r$4 = _r$4.$blk(); } if (_r$4 && _r$4.$blk !== undefined) { break s; }
+				$s = -1; return _r$4;
+			/* } */ case 8:
+		case 1:
+		p[0].fosterParenting = true;
+		$deferred.push([(function(p) { return function() {
+			p[0].fosterParenting = false;
+		}; })(p), []]);
+		_r$5 = inBodyIM(p[0]); /* */ $s = 43; case 43: if($c) { $c = false; _r$5 = _r$5.$blk(); } if (_r$5 && _r$5.$blk !== undefined) { break s; }
+		$s = -1; return _r$5;
+		/* */ } return; } } catch(err) { $err = err; $s = -1; return false; } finally { $callDeferred($deferred, $err); if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: inTableIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._4 = _4; $f._5 = _5; $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._r$4 = _r$4; $f._r$5 = _r$5; $f._ref = _ref; $f._v = _v; $f.p = p; $f.t = t; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
+	};
+	inCaptionIM = function(p) {
+		var _1, _2, _3, _r, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_1 = p.tok.Type;
+		if (_1 === (2)) {
+			_2 = p.tok.DataAtom;
+			if ((_2 === (143623)) || (_2 === (109315)) || (_2 === (109320)) || (_2 === (9989)) || (_2 === (37378)) || (_2 === (62725)) || (_2 === (208901)) || (_2 === (52226))) {
+				if (p.popUntil(3, new sliceType$2([143623]))) {
+					p.clearActiveFormattingElements();
+					p.im = inTableIM;
+					$s = -1; return false;
+				} else {
+					$s = -1; return true;
+				}
+			} else if (_2 === (408582)) {
+				p.reconstructActiveFormattingElements();
+				p.addElement();
+				p.framesetOK = false;
+				p.im = inSelectInTableIM;
+				$s = -1; return true;
+			}
+		} else if (_1 === (3)) {
+			_3 = p.tok.DataAtom;
+			if (_3 === (143623)) {
+				if (p.popUntil(3, new sliceType$2([143623]))) {
+					p.clearActiveFormattingElements();
+					p.im = inTableIM;
+				}
+				$s = -1; return true;
+			} else if (_3 === (365829)) {
+				if (p.popUntil(3, new sliceType$2([143623]))) {
+					p.clearActiveFormattingElements();
+					p.im = inTableIM;
+					$s = -1; return false;
+				} else {
+					$s = -1; return true;
+				}
+			} else if ((_3 === (10244)) || (_3 === (109315)) || (_3 === (109320)) || (_3 === (22020)) || (_3 === (9989)) || (_3 === (37378)) || (_3 === (62725)) || (_3 === (87554)) || (_3 === (208901)) || (_3 === (52226))) {
+				$s = -1; return true;
+			}
+		}
+		_r = inBodyIM(p); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inCaptionIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inColumnGroupIM = function(p) {
+		var _1, _2, _3, _r, _r$1, _r$2, _r$3, _r$4, p, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _r$4 = $f._r$4; p = $f.p; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (5)) { $s = 3; continue; }
+			/* */ if (_1 === (6)) { $s = 4; continue; }
+			/* */ if (_1 === (2)) { $s = 5; continue; }
+			/* */ if (_1 === (3)) { $s = 6; continue; }
+			/* */ if (_1 === (0)) { $s = 7; continue; }
+			/* */ $s = 8; continue;
+			/* if (_1 === (1)) { */ case 2:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 9; case 9: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				if (s.length < p.tok.Data.length) {
+					p.addText($substring(p.tok.Data, 0, (p.tok.Data.length - s.length >> 0)));
+					if (s === "") {
+						$s = -1; return true;
+					}
+					p.tok.Data = s;
+				}
+				$s = 8; continue;
+			/* } else if (_1 === (5)) { */ case 3:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } else if (_1 === (6)) { */ case 4:
+				$s = -1; return true;
+			/* } else if (_1 === (2)) { */ case 5:
+					_2 = p.tok.DataAtom;
+					/* */ if (_2 === (22020)) { $s = 11; continue; }
+					/* */ if (_2 === (109315)) { $s = 12; continue; }
+					/* */ if (_2 === (463880)) { $s = 13; continue; }
+					/* */ $s = 14; continue;
+					/* if (_2 === (22020)) { */ case 11:
+						_r$1 = inBodyIM(p); /* */ $s = 15; case 15: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if (_2 === (109315)) { */ case 12:
+						p.addElement();
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.acknowledgeSelfClosingTag();
+						$s = -1; return true;
+					/* } else if (_2 === (463880)) { */ case 13:
+						_r$2 = inHeadIM(p); /* */ $s = 16; case 16: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } */ case 14:
+				case 10:
+				$s = 8; continue;
+			/* } else if (_1 === (3)) { */ case 6:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (109320)) { $s = 18; continue; }
+					/* */ if (_3 === (109315)) { $s = 19; continue; }
+					/* */ if (_3 === (463880)) { $s = 20; continue; }
+					/* */ $s = 21; continue;
+					/* if (_3 === (109320)) { */ case 18:
+						if ((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top().DataAtom === 109320) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+							p.im = inTableIM;
+						}
+						$s = -1; return true;
+					/* } else if (_3 === (109315)) { */ case 19:
+						$s = -1; return true;
+					/* } else if (_3 === (463880)) { */ case 20:
+						_r$3 = inHeadIM(p); /* */ $s = 22; case 22: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+						$s = -1; return _r$3;
+					/* } */ case 21:
+				case 17:
+				$s = 8; continue;
+			/* } else if (_1 === (0)) { */ case 7:
+				_r$4 = inBodyIM(p); /* */ $s = 23; case 23: if($c) { $c = false; _r$4 = _r$4.$blk(); } if (_r$4 && _r$4.$blk !== undefined) { break s; }
+				$s = -1; return _r$4;
+			/* } */ case 8:
+		case 1:
+		if (!(((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top().DataAtom === 109320))) {
+			$s = -1; return true;
+		}
+		(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+		p.im = inTableIM;
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inColumnGroupIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._r$4 = _r$4; $f.p = p; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inTableBodyIM = function(p) {
+		var _1, _2, _3, _r, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (2)) { $s = 2; continue; }
+			/* */ if (_1 === (3)) { $s = 3; continue; }
+			/* */ if (_1 === (5)) { $s = 4; continue; }
+			/* */ $s = 5; continue;
+			/* if (_1 === (2)) { */ case 2:
+					_2 = p.tok.DataAtom;
+					/* */ if (_2 === (52226)) { $s = 7; continue; }
+					/* */ if ((_2 === (37378)) || (_2 === (87554))) { $s = 8; continue; }
+					/* */ if ((_2 === (143623)) || (_2 === (109315)) || (_2 === (109320)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901))) { $s = 9; continue; }
+					/* */ $s = 10; continue;
+					/* if (_2 === (52226)) { */ case 7:
+						p.clearStackToContext(5);
+						p.addElement();
+						p.im = inRowIM;
+						$s = -1; return true;
+					/* } else if ((_2 === (37378)) || (_2 === (87554))) { */ case 8:
+						$r = p.parseImpliedToken(2, 52226, new atom.Atom(52226).String()); /* */ $s = 11; case 11: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						$s = -1; return false;
+					/* } else if ((_2 === (143623)) || (_2 === (109315)) || (_2 === (109320)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901))) { */ case 9:
+						if (p.popUntil(3, new sliceType$2([9989, 208901, 62725]))) {
+							p.im = inTableIM;
+							$s = -1; return false;
+						}
+						$s = -1; return true;
+					/* } */ case 10:
+				case 6:
+				$s = 5; continue;
+			/* } else if (_1 === (3)) { */ case 3:
+				_3 = p.tok.DataAtom;
+				if ((_3 === (9989)) || (_3 === (62725)) || (_3 === (208901))) {
+					if (p.elementInScope(3, new sliceType$2([p.tok.DataAtom]))) {
+						p.clearStackToContext(5);
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.im = inTableIM;
+					}
+					$s = -1; return true;
+				} else if (_3 === (365829)) {
+					if (p.popUntil(3, new sliceType$2([9989, 208901, 62725]))) {
+						p.im = inTableIM;
+						$s = -1; return false;
+					}
+					$s = -1; return true;
+				} else if ((_3 === (10244)) || (_3 === (143623)) || (_3 === (109315)) || (_3 === (109320)) || (_3 === (22020)) || (_3 === (37378)) || (_3 === (87554)) || (_3 === (52226))) {
+					$s = -1; return true;
+				}
+				$s = 5; continue;
+			/* } else if (_1 === (5)) { */ case 4:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } */ case 5:
+		case 1:
+		_r = inTableIM(p); /* */ $s = 12; case 12: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inTableBodyIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inRowIM = function(p) {
+		var _1, _2, _3, _r, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (2)) { $s = 2; continue; }
+			/* */ if (_1 === (3)) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (_1 === (2)) { */ case 2:
+				_2 = p.tok.DataAtom;
+				if ((_2 === (37378)) || (_2 === (87554))) {
+					p.clearStackToContext(4);
+					p.addElement();
+					p.afe = $append(p.afe, scopeMarker);
+					p.im = inCellIM;
+					$s = -1; return true;
+				} else if ((_2 === (143623)) || (_2 === (109315)) || (_2 === (109320)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901)) || (_2 === (52226))) {
+					if (p.popUntil(3, new sliceType$2([52226]))) {
+						p.im = inTableBodyIM;
+						$s = -1; return false;
+					}
+					$s = -1; return true;
+				}
+				$s = 4; continue;
+			/* } else if (_1 === (3)) { */ case 3:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (52226)) { $s = 6; continue; }
+					/* */ if (_3 === (365829)) { $s = 7; continue; }
+					/* */ if ((_3 === (9989)) || (_3 === (62725)) || (_3 === (208901))) { $s = 8; continue; }
+					/* */ if ((_3 === (10244)) || (_3 === (143623)) || (_3 === (109315)) || (_3 === (109320)) || (_3 === (22020)) || (_3 === (37378)) || (_3 === (87554))) { $s = 9; continue; }
+					/* */ $s = 10; continue;
+					/* if (_3 === (52226)) { */ case 6:
+						if (p.popUntil(3, new sliceType$2([52226]))) {
+							p.im = inTableBodyIM;
+							$s = -1; return true;
+						}
+						$s = -1; return true;
+					/* } else if (_3 === (365829)) { */ case 7:
+						if (p.popUntil(3, new sliceType$2([52226]))) {
+							p.im = inTableBodyIM;
+							$s = -1; return false;
+						}
+						$s = -1; return true;
+					/* } else if ((_3 === (9989)) || (_3 === (62725)) || (_3 === (208901))) { */ case 8:
+						/* */ if (p.elementInScope(3, new sliceType$2([p.tok.DataAtom]))) { $s = 11; continue; }
+						/* */ $s = 12; continue;
+						/* if (p.elementInScope(3, new sliceType$2([p.tok.DataAtom]))) { */ case 11:
+							$r = p.parseImpliedToken(3, 52226, new atom.Atom(52226).String()); /* */ $s = 13; case 13: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+							$s = -1; return false;
+						/* } */ case 12:
+						$s = -1; return true;
+					/* } else if ((_3 === (10244)) || (_3 === (143623)) || (_3 === (109315)) || (_3 === (109320)) || (_3 === (22020)) || (_3 === (37378)) || (_3 === (87554))) { */ case 9:
+						$s = -1; return true;
+					/* } */ case 10:
+				case 5:
+			/* } */ case 4:
+		case 1:
+		_r = inTableIM(p); /* */ $s = 14; case 14: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inRowIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inCellIM = function(p) {
+		var _1, _2, _3, _r, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_1 = p.tok.Type;
+		if (_1 === (2)) {
+			_2 = p.tok.DataAtom;
+			if ((_2 === (143623)) || (_2 === (109315)) || (_2 === (109320)) || (_2 === (9989)) || (_2 === (37378)) || (_2 === (62725)) || (_2 === (87554)) || (_2 === (208901)) || (_2 === (52226))) {
+				if (p.popUntil(3, new sliceType$2([37378, 87554]))) {
+					p.clearActiveFormattingElements();
+					p.im = inRowIM;
+					$s = -1; return false;
+				}
+				$s = -1; return true;
+			} else if (_2 === (408582)) {
+				p.reconstructActiveFormattingElements();
+				p.addElement();
+				p.framesetOK = false;
+				p.im = inSelectInTableIM;
+				$s = -1; return true;
+			}
+		} else if (_1 === (3)) {
+			_3 = p.tok.DataAtom;
+			if ((_3 === (37378)) || (_3 === (87554))) {
+				if (!p.popUntil(3, new sliceType$2([p.tok.DataAtom]))) {
+					$s = -1; return true;
+				}
+				p.clearActiveFormattingElements();
+				p.im = inRowIM;
+				$s = -1; return true;
+			} else if ((_3 === (10244)) || (_3 === (143623)) || (_3 === (109315)) || (_3 === (109320)) || (_3 === (22020))) {
+				$s = -1; return true;
+			} else if ((_3 === (365829)) || (_3 === (9989)) || (_3 === (62725)) || (_3 === (208901)) || (_3 === (52226))) {
+				if (!p.elementInScope(3, new sliceType$2([p.tok.DataAtom]))) {
+					$s = -1; return true;
+				}
+				p.popUntil(3, new sliceType$2([37378, 87554]));
+				p.clearActiveFormattingElements();
+				p.im = inRowIM;
+				$s = -1; return false;
+			}
+		}
+		_r = inBodyIM(p); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inCellIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inSelectIM = function(p) {
+		var _1, _2, _3, _r, _r$1, _r$2, _r$3, i, p, x, x$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; i = $f.i; p = $f.p; x = $f.x; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (2)) { $s = 3; continue; }
+			/* */ if (_1 === (3)) { $s = 4; continue; }
+			/* */ if (_1 === (5)) { $s = 5; continue; }
+			/* */ if (_1 === (6)) { $s = 6; continue; }
+			/* */ if (_1 === (0)) { $s = 7; continue; }
+			/* */ $s = 8; continue;
+			/* if (_1 === (1)) { */ case 2:
+				p.addText(strings.Replace(p.tok.Data, "\x00", "", -1));
+				$s = 8; continue;
+			/* } else if (_1 === (2)) { */ case 3:
+					_2 = p.tok.DataAtom;
+					/* */ if (_2 === (22020)) { $s = 10; continue; }
+					/* */ if (_2 === (451334)) { $s = 11; continue; }
+					/* */ if (_2 === (24328)) { $s = 12; continue; }
+					/* */ if (_2 === (408582)) { $s = 13; continue; }
+					/* */ if ((_2 === (281349)) || (_2 === (12806)) || (_2 === (217608))) { $s = 14; continue; }
+					/* */ if ((_2 === (137222)) || (_2 === (463880))) { $s = 15; continue; }
+					/* */ $s = 16; continue;
+					/* if (_2 === (22020)) { */ case 10:
+						_r = inBodyIM(p); /* */ $s = 17; case 17: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+						$s = -1; return _r;
+					/* } else if (_2 === (451334)) { */ case 11:
+						if (p.top().DataAtom === 451334) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						}
+						p.addElement();
+						$s = 16; continue;
+					/* } else if (_2 === (24328)) { */ case 12:
+						if (p.top().DataAtom === 451334) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						}
+						if (p.top().DataAtom === 24328) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						}
+						p.addElement();
+						$s = 16; continue;
+					/* } else if (_2 === (408582)) { */ case 13:
+						p.tok.Type = 3;
+						$s = -1; return false;
+					/* } else if ((_2 === (281349)) || (_2 === (12806)) || (_2 === (217608))) { */ case 14:
+						/* */ if (p.elementInScope(6, new sliceType$2([408582]))) { $s = 18; continue; }
+						/* */ $s = 19; continue;
+						/* if (p.elementInScope(6, new sliceType$2([408582]))) { */ case 18:
+							$r = p.parseImpliedToken(3, 408582, new atom.Atom(408582).String()); /* */ $s = 20; case 20: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+							$s = -1; return false;
+						/* } */ case 19:
+						p.tokenizer.NextIsNotRawText();
+						$s = -1; return true;
+					/* } else if ((_2 === (137222)) || (_2 === (463880))) { */ case 15:
+						_r$1 = inHeadIM(p); /* */ $s = 21; case 21: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } */ case 16:
+				case 9:
+				$s = 8; continue;
+			/* } else if (_1 === (3)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (451334)) { $s = 23; continue; }
+					/* */ if (_3 === (24328)) { $s = 24; continue; }
+					/* */ if (_3 === (408582)) { $s = 25; continue; }
+					/* */ if (_3 === (463880)) { $s = 26; continue; }
+					/* */ $s = 27; continue;
+					/* if (_3 === (451334)) { */ case 23:
+						if (p.top().DataAtom === 451334) {
+							(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						}
+						$s = 27; continue;
+					/* } else if (_3 === (24328)) { */ case 24:
+						i = p.oe.$length - 1 >> 0;
+						if ((x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i])).DataAtom === 451334) {
+							i = i - (1) >> 0;
+						}
+						if ((x$1 = p.oe, ((i < 0 || i >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + i])).DataAtom === 24328) {
+							p.oe = $subslice(p.oe, 0, i);
+						}
+						$s = 27; continue;
+					/* } else if (_3 === (408582)) { */ case 25:
+						if (p.popUntil(6, new sliceType$2([408582]))) {
+							p.resetInsertionMode();
+						}
+						$s = 27; continue;
+					/* } else if (_3 === (463880)) { */ case 26:
+						_r$2 = inHeadIM(p); /* */ $s = 28; case 28: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } */ case 27:
+				case 22:
+				$s = 8; continue;
+			/* } else if (_1 === (5)) { */ case 5:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = 8; continue;
+			/* } else if (_1 === (6)) { */ case 6:
+				$s = -1; return true;
+			/* } else if (_1 === (0)) { */ case 7:
+				_r$3 = inBodyIM(p); /* */ $s = 29; case 29: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+				$s = -1; return _r$3;
+			/* } */ case 8:
+		case 1:
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inSelectIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f.i = i; $f.p = p; $f.x = x; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inSelectInTableIM = function(p) {
+		var _1, _2, _r, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _r = $f._r; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if ((_1 === (2)) || (_1 === (3))) { $s = 2; continue; }
+			/* */ $s = 3; continue;
+			/* if ((_1 === (2)) || (_1 === (3))) { */ case 2:
+					_2 = p.tok.DataAtom;
+					/* */ if ((_2 === (143623)) || (_2 === (365829)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901)) || (_2 === (52226)) || (_2 === (37378)) || (_2 === (87554))) { $s = 5; continue; }
+					/* */ $s = 6; continue;
+					/* if ((_2 === (143623)) || (_2 === (365829)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901)) || (_2 === (52226)) || (_2 === (37378)) || (_2 === (87554))) { */ case 5:
+						/* */ if ((p.tok.Type === 2) || p.elementInScope(3, new sliceType$2([p.tok.DataAtom]))) { $s = 7; continue; }
+						/* */ $s = 8; continue;
+						/* if ((p.tok.Type === 2) || p.elementInScope(3, new sliceType$2([p.tok.DataAtom]))) { */ case 7:
+							$r = p.parseImpliedToken(3, 408582, new atom.Atom(408582).String()); /* */ $s = 10; case 10: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+							$s = -1; return false;
+						/* } else { */ case 8:
+							$s = -1; return true;
+						/* } */ case 9:
+					/* } */ case 6:
+				case 4:
+			/* } */ case 3:
+		case 1:
+		_r = inSelectIM(p); /* */ $s = 11; case 11: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inSelectInTableIM }; } $f._1 = _1; $f._2 = _2; $f._r = _r; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inTemplateIM = function(p) {
+		var _1, _2, _3, _r, _r$1, _r$2, i, n, p, x, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; i = $f.i; n = $f.n; p = $f.p; x = $f.x; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if ((_1 === (1)) || (_1 === (5)) || (_1 === (6))) { $s = 2; continue; }
+			/* */ if (_1 === (2)) { $s = 3; continue; }
+			/* */ if (_1 === (3)) { $s = 4; continue; }
+			/* */ if (_1 === (0)) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if ((_1 === (1)) || (_1 === (5)) || (_1 === (6))) { */ case 2:
+				_r = inBodyIM(p); /* */ $s = 7; case 7: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				$s = -1; return _r;
+			/* } else if (_1 === (2)) { */ case 3:
+					_2 = p.tok.DataAtom;
+					/* */ if ((_2 === (15108)) || (_2 === (15112)) || (_2 === (89607)) || (_2 === (95236)) || (_2 === (309252)) || (_2 === (35080)) || (_2 === (137222)) || (_2 === (458501)) || (_2 === (463880)) || (_2 === (69637))) { $s = 9; continue; }
+					/* */ if ((_2 === (143623)) || (_2 === (109320)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901))) { $s = 10; continue; }
+					/* */ if (_2 === (109315)) { $s = 11; continue; }
+					/* */ if (_2 === (52226)) { $s = 12; continue; }
+					/* */ if ((_2 === (37378)) || (_2 === (87554))) { $s = 13; continue; }
+					/* */ $s = 14; continue;
+					/* if ((_2 === (15108)) || (_2 === (15112)) || (_2 === (89607)) || (_2 === (95236)) || (_2 === (309252)) || (_2 === (35080)) || (_2 === (137222)) || (_2 === (458501)) || (_2 === (463880)) || (_2 === (69637))) { */ case 9:
+						_r$1 = inHeadIM(p); /* */ $s = 16; case 16: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if ((_2 === (143623)) || (_2 === (109320)) || (_2 === (9989)) || (_2 === (62725)) || (_2 === (208901))) { */ case 10:
+						(p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).pop();
+						p.templateStack = $append(p.templateStack, inTableIM);
+						p.im = inTableIM;
+						$s = -1; return false;
+					/* } else if (_2 === (109315)) { */ case 11:
+						(p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).pop();
+						p.templateStack = $append(p.templateStack, inColumnGroupIM);
+						p.im = inColumnGroupIM;
+						$s = -1; return false;
+					/* } else if (_2 === (52226)) { */ case 12:
+						(p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).pop();
+						p.templateStack = $append(p.templateStack, inTableBodyIM);
+						p.im = inTableBodyIM;
+						$s = -1; return false;
+					/* } else if ((_2 === (37378)) || (_2 === (87554))) { */ case 13:
+						(p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).pop();
+						p.templateStack = $append(p.templateStack, inRowIM);
+						p.im = inRowIM;
+						$s = -1; return false;
+					/* } else { */ case 14:
+						(p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).pop();
+						p.templateStack = $append(p.templateStack, inBodyIM);
+						p.im = inBodyIM;
+						$s = -1; return false;
+					/* } */ case 15:
+				case 8:
+				$s = 6; continue;
+			/* } else if (_1 === (3)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (463880)) { $s = 18; continue; }
+					/* */ $s = 19; continue;
+					/* if (_3 === (463880)) { */ case 18:
+						_r$2 = inHeadIM(p); /* */ $s = 21; case 21: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } else { */ case 19:
+						$s = -1; return true;
+					/* } */ case 20:
+				case 17:
+				$s = 6; continue;
+			/* } else if (_1 === (0)) { */ case 5:
+				if (!(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).contains(463880)) {
+					$s = -1; return true;
+				}
+				p.generateImpliedEndTags(new sliceType([]));
+				i = p.oe.$length - 1 >> 0;
+				while (true) {
+					if (!(i >= 0)) { break; }
+					n = (x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i]));
+					if (n.Namespace === "" && (n.DataAtom === 463880)) {
+						p.oe = $subslice(p.oe, 0, i);
+						break;
+					}
+					i = i - (1) >> 0;
+				}
+				p.clearActiveFormattingElements();
+				(p.$ptr_templateStack || (p.$ptr_templateStack = new ptrType$2(function() { return this.$target.templateStack; }, function($v) { this.$target.templateStack = $v; }, p))).pop();
+				p.resetInsertionMode();
+				$s = -1; return false;
+			/* } */ case 6:
+		case 1:
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inTemplateIM }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f.i = i; $f.n = n; $f.p = p; $f.x = x; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	afterBodyIM = function(p) {
+		var _1, _r, _r$1, _r$2, p, s, x, x$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; p = $f.p; s = $f.s; x = $f.x; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (0)) { $s = 2; continue; }
+			/* */ if (_1 === (1)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (3)) { $s = 5; continue; }
+			/* */ if (_1 === (5)) { $s = 6; continue; }
+			/* */ $s = 7; continue;
+			/* if (_1 === (0)) { */ case 2:
+				$s = -1; return true;
+			/* } else if (_1 === (1)) { */ case 3:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 8; case 8: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				/* */ if (s.length === 0) { $s = 9; continue; }
+				/* */ $s = 10; continue;
+				/* if (s.length === 0) { */ case 9:
+					_r$1 = inBodyIM(p); /* */ $s = 11; case 11: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+					$s = -1; return _r$1;
+				/* } */ case 10:
+				$s = 7; continue;
+			/* } else if (_1 === (2)) { */ case 4:
+				/* */ if (p.tok.DataAtom === 22020) { $s = 12; continue; }
+				/* */ $s = 13; continue;
+				/* if (p.tok.DataAtom === 22020) { */ case 12:
+					_r$2 = inBodyIM(p); /* */ $s = 14; case 14: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+					$s = -1; return _r$2;
+				/* } */ case 13:
+				$s = 7; continue;
+			/* } else if (_1 === (3)) { */ case 5:
+				if (p.tok.DataAtom === 22020) {
+					if (!p.fragment) {
+						p.im = afterAfterBodyIM;
+					}
+					$s = -1; return true;
+				}
+				$s = 7; continue;
+			/* } else if (_1 === (5)) { */ case 6:
+				if (p.oe.$length < 1 || !(((x = p.oe, (0 >= x.$length ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + 0])).DataAtom === 22020))) {
+					$panic(new $String("html: bad parser state: <html> element not found, in the after-body insertion mode"));
+				}
+				(x$1 = p.oe, (0 >= x$1.$length ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + 0])).AppendChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } */ case 7:
+		case 1:
+		p.im = inBodyIM;
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: afterBodyIM }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f.p = p; $f.s = s; $f.x = x; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	inFramesetIM = function(p) {
+		var _1, _3, _4, _r, _r$1, _r$2, p, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _3 = $f._3; _4 = $f._4; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; p = $f.p; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (5)) { $s = 2; continue; }
+			/* */ if (_1 === (1)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (3)) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if (_1 === (5)) { */ case 2:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = 6; continue;
+			/* } else if (_1 === (1)) { */ case 3:
+				_r = strings.Map((function(c) {
+					var _2, c;
+					_2 = c;
+					if ((_2 === (32)) || (_2 === (9)) || (_2 === (10)) || (_2 === (12)) || (_2 === (13))) {
+						return c;
+					}
+					return -1;
+				}), p.tok.Data); /* */ $s = 7; case 7: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				if (!(s === "")) {
+					p.addText(s);
+				}
+				$s = 6; continue;
+			/* } else if (_1 === (2)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (22020)) { $s = 9; continue; }
+					/* */ if (_3 === (35592)) { $s = 10; continue; }
+					/* */ if (_3 === (35589)) { $s = 11; continue; }
+					/* */ if (_3 === (35080)) { $s = 12; continue; }
+					/* */ $s = 13; continue;
+					/* if (_3 === (22020)) { */ case 9:
+						_r$1 = inBodyIM(p); /* */ $s = 14; case 14: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if (_3 === (35592)) { */ case 10:
+						p.addElement();
+						$s = 13; continue;
+					/* } else if (_3 === (35589)) { */ case 11:
+						p.addElement();
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						p.acknowledgeSelfClosingTag();
+						$s = 13; continue;
+					/* } else if (_3 === (35080)) { */ case 12:
+						_r$2 = inHeadIM(p); /* */ $s = 15; case 15: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } */ case 13:
+				case 8:
+				$s = 6; continue;
+			/* } else if (_1 === (3)) { */ case 5:
+				_4 = p.tok.DataAtom;
+				if (_4 === (35592)) {
+					if (!(((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top().DataAtom === 22020))) {
+						(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+						if (!(((p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top().DataAtom === 35592))) {
+							p.im = afterFramesetIM;
+							$s = -1; return true;
+						}
+					}
+				}
+			/* } */ case 6:
+		case 1:
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: inFramesetIM }; } $f._1 = _1; $f._3 = _3; $f._4 = _4; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f.p = p; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	afterFramesetIM = function(p) {
+		var _1, _3, _4, _r, _r$1, _r$2, p, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _3 = $f._3; _4 = $f._4; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; p = $f.p; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (5)) { $s = 2; continue; }
+			/* */ if (_1 === (1)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (3)) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if (_1 === (5)) { */ case 2:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = 6; continue;
+			/* } else if (_1 === (1)) { */ case 3:
+				_r = strings.Map((function(c) {
+					var _2, c;
+					_2 = c;
+					if ((_2 === (32)) || (_2 === (9)) || (_2 === (10)) || (_2 === (12)) || (_2 === (13))) {
+						return c;
+					}
+					return -1;
+				}), p.tok.Data); /* */ $s = 7; case 7: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				if (!(s === "")) {
+					p.addText(s);
+				}
+				$s = 6; continue;
+			/* } else if (_1 === (2)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (22020)) { $s = 9; continue; }
+					/* */ if (_3 === (35080)) { $s = 10; continue; }
+					/* */ $s = 11; continue;
+					/* if (_3 === (22020)) { */ case 9:
+						_r$1 = inBodyIM(p); /* */ $s = 12; case 12: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						$s = -1; return _r$1;
+					/* } else if (_3 === (35080)) { */ case 10:
+						_r$2 = inHeadIM(p); /* */ $s = 13; case 13: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } */ case 11:
+				case 8:
+				$s = 6; continue;
+			/* } else if (_1 === (3)) { */ case 5:
+				_4 = p.tok.DataAtom;
+				if (_4 === (22020)) {
+					p.im = afterAfterFramesetIM;
+					$s = -1; return true;
+				}
+			/* } */ case 6:
+		case 1:
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: afterFramesetIM }; } $f._1 = _1; $f._3 = _3; $f._4 = _4; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f.p = p; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	afterAfterBodyIM = function(p) {
+		var _1, _r, _r$1, _r$2, _r$3, p, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; p = $f.p; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (0)) { $s = 2; continue; }
+			/* */ if (_1 === (1)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (5)) { $s = 5; continue; }
+			/* */ if (_1 === (6)) { $s = 6; continue; }
+			/* */ $s = 7; continue;
+			/* if (_1 === (0)) { */ case 2:
+				$s = -1; return true;
+			/* } else if (_1 === (1)) { */ case 3:
+				_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f"); /* */ $s = 8; case 8: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				/* */ if (s.length === 0) { $s = 9; continue; }
+				/* */ $s = 10; continue;
+				/* if (s.length === 0) { */ case 9:
+					_r$1 = inBodyIM(p); /* */ $s = 11; case 11: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+					$s = -1; return _r$1;
+				/* } */ case 10:
+				$s = 7; continue;
+			/* } else if (_1 === (2)) { */ case 4:
+				/* */ if (p.tok.DataAtom === 22020) { $s = 12; continue; }
+				/* */ $s = 13; continue;
+				/* if (p.tok.DataAtom === 22020) { */ case 12:
+					_r$2 = inBodyIM(p); /* */ $s = 14; case 14: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+					$s = -1; return _r$2;
+				/* } */ case 13:
+				$s = 7; continue;
+			/* } else if (_1 === (5)) { */ case 5:
+				p.doc.AppendChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = -1; return true;
+			/* } else if (_1 === (6)) { */ case 6:
+				_r$3 = inBodyIM(p); /* */ $s = 15; case 15: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+				$s = -1; return _r$3;
+			/* } */ case 7:
+		case 1:
+		p.im = inBodyIM;
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: afterAfterBodyIM }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f.p = p; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	afterAfterFramesetIM = function(p) {
+		var _1, _3, _r, _r$1, _r$2, _r$3, _r$4, p, s, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _3 = $f._3; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _r$4 = $f._r$4; p = $f.p; s = $f.s; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (5)) { $s = 2; continue; }
+			/* */ if (_1 === (1)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (6)) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if (_1 === (5)) { */ case 2:
+				p.doc.AppendChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = 6; continue;
+			/* } else if (_1 === (1)) { */ case 3:
+				_r = strings.Map((function(c) {
+					var _2, c;
+					_2 = c;
+					if ((_2 === (32)) || (_2 === (9)) || (_2 === (10)) || (_2 === (12)) || (_2 === (13))) {
+						return c;
+					}
+					return -1;
+				}), p.tok.Data); /* */ $s = 7; case 7: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				/* */ if (!(s === "")) { $s = 8; continue; }
+				/* */ $s = 9; continue;
+				/* if (!(s === "")) { */ case 8:
+					p.tok.Data = s;
+					_r$1 = inBodyIM(p); /* */ $s = 10; case 10: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+					$s = -1; return _r$1;
+				/* } */ case 9:
+				$s = 6; continue;
+			/* } else if (_1 === (2)) { */ case 4:
+					_3 = p.tok.DataAtom;
+					/* */ if (_3 === (22020)) { $s = 12; continue; }
+					/* */ if (_3 === (35080)) { $s = 13; continue; }
+					/* */ $s = 14; continue;
+					/* if (_3 === (22020)) { */ case 12:
+						_r$2 = inBodyIM(p); /* */ $s = 15; case 15: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } else if (_3 === (35080)) { */ case 13:
+						_r$3 = inHeadIM(p); /* */ $s = 16; case 16: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+						$s = -1; return _r$3;
+					/* } */ case 14:
+				case 11:
+				$s = 6; continue;
+			/* } else if (_1 === (6)) { */ case 5:
+				_r$4 = inBodyIM(p); /* */ $s = 17; case 17: if($c) { $c = false; _r$4 = _r$4.$blk(); } if (_r$4 && _r$4.$blk !== undefined) { break s; }
+				$s = -1; return _r$4;
+			/* } */ case 6:
+		case 1:
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: afterAfterFramesetIM }; } $f._1 = _1; $f._3 = _3; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._r$4 = _r$4; $f.p = p; $f.s = s; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	parseForeignContent = function(p) {
+		var _1, _2, _3, _entry, _entry$1, _i, _r, _r$1, _r$2, _ref, _v, attr, b, i, i$1, n, namespace, p, x, x$1, x$2, x$3, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _entry = $f._entry; _entry$1 = $f._entry$1; _i = $f._i; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _ref = $f._ref; _v = $f._v; attr = $f.attr; b = $f.b; i = $f.i; i$1 = $f.i$1; n = $f.n; namespace = $f.namespace; p = $f.p; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; x$3 = $f.x$3; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+			_1 = p.tok.Type;
+			/* */ if (_1 === (1)) { $s = 2; continue; }
+			/* */ if (_1 === (5)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (3)) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if (_1 === (1)) { */ case 2:
+				/* */ if (p.framesetOK) { $s = 7; continue; }
+				/* */ $s = 8; continue;
+				/* if (p.framesetOK) { */ case 7:
+					_r = strings.TrimLeft(p.tok.Data, " \t\r\n\f\x00"); /* */ $s = 9; case 9: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+					p.framesetOK = _r === "";
+				/* } */ case 8:
+				p.tok.Data = strings.Replace(p.tok.Data, "\x00", "\xEF\xBF\xBD", -1);
+				p.addText(p.tok.Data);
+				$s = 6; continue;
+			/* } else if (_1 === (5)) { */ case 3:
+				p.addChild(new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 4, 0, p.tok.Data, "", sliceType$1.nil));
+				$s = 6; continue;
+			/* } else if (_1 === (2)) { */ case 4:
+				b = (_entry = breakout[$String.keyFor(p.tok.Data)], _entry !== undefined ? _entry.v : false);
+				if (p.tok.DataAtom === 16132) {
+					_ref = p.tok.Attr;
+					_i = 0;
+					loop:
+					while (true) {
+						if (!(_i < _ref.$length)) { break; }
+						attr = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+						_2 = attr.Key;
+						if (_2 === ("color") || _2 === ("face") || _2 === ("size")) {
+							b = true;
+							break loop;
+						}
+						_i++;
+					}
+				}
+				/* */ if (b) { $s = 10; continue; }
+				/* */ $s = 11; continue;
+				/* if (b) { */ case 10:
+					i = p.oe.$length - 1 >> 0;
+					/* while (true) { */ case 12:
+						/* if (!(i >= 0)) { break; } */ if(!(i >= 0)) { $s = 13; continue; }
+						n = (x = p.oe, ((i < 0 || i >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + i]));
+						if (n.Namespace === "") { _v = true; $s = 16; continue s; }
+						_r$1 = htmlIntegrationPoint(n); /* */ $s = 17; case 17: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						_v = _r$1; case 16:
+						/* */ if (_v || mathMLTextIntegrationPoint(n)) { $s = 14; continue; }
+						/* */ $s = 15; continue;
+						/* if (_v || mathMLTextIntegrationPoint(n)) { */ case 14:
+							p.oe = $subslice(p.oe, 0, (i + 1 >> 0));
+							/* break; */ $s = 13; continue;
+						/* } */ case 15:
+						i = i - (1) >> 0;
+					/* } */ $s = 12; continue; case 13:
+					$s = -1; return false;
+				/* } */ case 11:
+				_3 = p.top().Namespace;
+				if (_3 === ("math")) {
+					adjustAttributeNames(p.tok.Attr, mathMLAttributeAdjustments);
+				} else if (_3 === ("svg")) {
+					x$1 = (_entry$1 = svgTagNameAdjustments[$String.keyFor(p.tok.Data)], _entry$1 !== undefined ? _entry$1.v : "");
+					if (!(x$1 === "")) {
+						p.tok.DataAtom = atom.Lookup((new sliceType$3($stringToBytes(x$1))));
+						p.tok.Data = x$1;
+					}
+					adjustAttributeNames(p.tok.Attr, svgAttributeAdjustments);
+				} else {
+					$panic(new $String("html: bad parser state: unexpected namespace"));
+				}
+				adjustForeignAttributes(p.tok.Attr);
+				namespace = p.top().Namespace;
+				p.addElement();
+				p.top().Namespace = namespace;
+				if (!(namespace === "")) {
+					p.tokenizer.NextIsNotRawText();
+				}
+				if (p.hasSelfClosingToken) {
+					(p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).pop();
+					p.acknowledgeSelfClosingTag();
+				}
+				$s = 6; continue;
+			/* } else if (_1 === (3)) { */ case 5:
+				i$1 = p.oe.$length - 1 >> 0;
+				/* while (true) { */ case 18:
+					/* if (!(i$1 >= 0)) { break; } */ if(!(i$1 >= 0)) { $s = 19; continue; }
+					/* */ if ((x$2 = p.oe, ((i$1 < 0 || i$1 >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + i$1])).Namespace === "") { $s = 20; continue; }
+					/* */ $s = 21; continue;
+					/* if ((x$2 = p.oe, ((i$1 < 0 || i$1 >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + i$1])).Namespace === "") { */ case 20:
+						_r$2 = p.im(p); /* */ $s = 22; case 22: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+						$s = -1; return _r$2;
+					/* } */ case 21:
+					if (strings.EqualFold((x$3 = p.oe, ((i$1 < 0 || i$1 >= x$3.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$3.$array[x$3.$offset + i$1])).Data, p.tok.Data)) {
+						p.oe = $subslice(p.oe, 0, i$1);
+						/* break; */ $s = 19; continue;
+					}
+					i$1 = i$1 - (1) >> 0;
+				/* } */ $s = 18; continue; case 19:
+				$s = -1; return true;
+			/* } */ case 6:
+		case 1:
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: parseForeignContent }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._entry = _entry; $f._entry$1 = _entry$1; $f._i = _i; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._ref = _ref; $f._v = _v; $f.attr = attr; $f.b = b; $f.i = i; $f.i$1 = i$1; $f.n = n; $f.namespace = namespace; $f.p = p; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	parser.ptr.prototype.inForeignContent = function() {
+		var _r, n, p, x, x$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; n = $f.n; p = $f.p; x = $f.x; x$1 = $f.x$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		p = this;
+		if (p.oe.$length === 0) {
+			$s = -1; return false;
+		}
+		n = (x = p.oe, x$1 = p.oe.$length - 1 >> 0, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+		if (n.Namespace === "") {
+			$s = -1; return false;
+		}
+		if (mathMLTextIntegrationPoint(n)) {
+			if ((p.tok.Type === 2) && !((p.tok.DataAtom === 198662)) && !((p.tok.DataAtom === 45066))) {
+				$s = -1; return false;
+			}
+			if (p.tok.Type === 1) {
+				$s = -1; return false;
+			}
+		}
+		if (n.Namespace === "math" && (n.DataAtom === 117006) && (p.tok.Type === 2) && (p.tok.DataAtom === 462339)) {
+			$s = -1; return false;
+		}
+		_r = htmlIntegrationPoint(n); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		/* */ if (_r && ((p.tok.Type === 2) || (p.tok.Type === 1))) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (_r && ((p.tok.Type === 2) || (p.tok.Type === 1))) { */ case 1:
+			$s = -1; return false;
+		/* } */ case 2:
+		if (p.tok.Type === 0) {
+			$s = -1; return false;
+		}
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: parser.ptr.prototype.inForeignContent }; } $f._r = _r; $f.n = n; $f.p = p; $f.x = x; $f.x$1 = x$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	parser.prototype.inForeignContent = function() { return this.$val.inForeignContent(); };
+	parser.ptr.prototype.parseImpliedToken = function(t, dataAtom, data) {
+		var _tmp, _tmp$1, _tmp$2, _tmp$3, data, dataAtom, p, realToken, selfClosing, t, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _tmp = $f._tmp; _tmp$1 = $f._tmp$1; _tmp$2 = $f._tmp$2; _tmp$3 = $f._tmp$3; data = $f.data; dataAtom = $f.dataAtom; p = $f.p; realToken = $f.realToken; selfClosing = $f.selfClosing; t = $f.t; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		p = this;
+		_tmp = $clone(p.tok, Token);
+		_tmp$1 = p.hasSelfClosingToken;
+		realToken = $clone(_tmp, Token);
+		selfClosing = _tmp$1;
+		Token.copy(p.tok, new Token.ptr(t, dataAtom, data, sliceType$1.nil));
+		p.hasSelfClosingToken = false;
+		$r = p.parseCurrentToken(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		_tmp$2 = $clone(realToken, Token);
+		_tmp$3 = selfClosing;
+		Token.copy(p.tok, _tmp$2);
+		p.hasSelfClosingToken = _tmp$3;
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: parser.ptr.prototype.parseImpliedToken }; } $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f._tmp$2 = _tmp$2; $f._tmp$3 = _tmp$3; $f.data = data; $f.dataAtom = dataAtom; $f.p = p; $f.realToken = realToken; $f.selfClosing = selfClosing; $f.t = t; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	parser.prototype.parseImpliedToken = function(t, dataAtom, data) { return this.$val.parseImpliedToken(t, dataAtom, data); };
+	parser.ptr.prototype.parseCurrentToken = function() {
+		var _r, _r$1, _r$2, consumed, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; consumed = $f.consumed; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		p = this;
+		if (p.tok.Type === 4) {
+			p.hasSelfClosingToken = true;
+			p.tok.Type = 2;
+		}
+		consumed = false;
+		/* while (true) { */ case 1:
+			/* if (!(!consumed)) { break; } */ if(!(!consumed)) { $s = 2; continue; }
+			_r = p.inForeignContent(); /* */ $s = 6; case 6: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			/* */ if (_r) { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (_r) { */ case 3:
+				_r$1 = parseForeignContent(p); /* */ $s = 7; case 7: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+				consumed = _r$1;
+				$s = 5; continue;
+			/* } else { */ case 4:
+				_r$2 = p.im(p); /* */ $s = 8; case 8: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+				consumed = _r$2;
+			/* } */ case 5:
+		/* } */ $s = 1; continue; case 2:
+		if (p.hasSelfClosingToken) {
+			p.hasSelfClosingToken = false;
+		}
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: parser.ptr.prototype.parseCurrentToken }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f.consumed = consumed; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	parser.prototype.parseCurrentToken = function() { return this.$val.parseCurrentToken(); };
+	parser.ptr.prototype.parse = function() {
+		var _r, err, n, p, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; err = $f.err; n = $f.n; p = $f.p; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		p = this;
+		err = $ifaceNil;
+		/* while (true) { */ case 1:
+			/* if (!(!($interfaceIsEqual(err, io.EOF)))) { break; } */ if(!(!($interfaceIsEqual(err, io.EOF)))) { $s = 2; continue; }
+			n = (p.$ptr_oe || (p.$ptr_oe = new ptrType$1(function() { return this.$target.oe; }, function($v) { this.$target.oe = $v; }, p))).top();
+			p.tokenizer.AllowCDATA(!(n === ptrType.nil) && !(n.Namespace === ""));
+			_r = p.tokenizer.Next(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_r;
+			Token.copy(p.tok, p.tokenizer.Token());
+			if (p.tok.Type === 0) {
+				err = p.tokenizer.Err();
+				if (!($interfaceIsEqual(err, $ifaceNil)) && !($interfaceIsEqual(err, io.EOF))) {
+					$s = -1; return err;
+				}
+			}
+			$r = p.parseCurrentToken(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return $ifaceNil;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: parser.ptr.prototype.parse }; } $f._r = _r; $f.err = err; $f.n = n; $f.p = p; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	parser.prototype.parse = function() { return this.$val.parse(); };
+	Parse = function(r) {
+		var _r, _r$1, err, p, r, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; err = $f.err; p = $f.p; r = $f.r; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = NewTokenizer(r); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		p = new parser.ptr(_r, new Token.ptr(0, 0, "", sliceType$1.nil), false, new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 2, 0, "", "", sliceType$1.nil), nodeStack.nil, nodeStack.nil, ptrType.nil, ptrType.nil, true, true, insertionModeStack.nil, initialIM, $throwNilPointerError, false, false, false, ptrType.nil);
+		_r$1 = p.parse(); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		err = _r$1;
+		if (!($interfaceIsEqual(err, $ifaceNil))) {
+			$s = -1; return [ptrType.nil, err];
+		}
+		$s = -1; return [p.doc, $ifaceNil];
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Parse }; } $f._r = _r; $f._r$1 = _r$1; $f.err = err; $f.p = p; $f.r = r; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Parse = Parse;
+	TokenType.prototype.String = function() {
+		var _1, t;
+		t = this.$val;
+		_1 = t;
+		if (_1 === (0)) {
+			return "Error";
+		} else if (_1 === (1)) {
+			return "Text";
+		} else if (_1 === (2)) {
+			return "StartTag";
+		} else if (_1 === (3)) {
+			return "EndTag";
+		} else if (_1 === (4)) {
+			return "SelfClosingTag";
+		} else if (_1 === (5)) {
+			return "Comment";
+		} else if (_1 === (6)) {
+			return "Doctype";
+		}
+		return "Invalid(" + strconv.Itoa(((t >> 0))) + ")";
+	};
+	$ptrType(TokenType).prototype.String = function() { return new TokenType(this.$get()).String(); };
+	Token.ptr.prototype.tagString = function() {
+		var _i, _r, _ref, a, buf, t, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; a = $f.a; buf = $f.buf; t = $f.t; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		t = this;
+		if (t.Attr.$length === 0) {
+			$s = -1; return t.Data;
+		}
+		buf = bytes.NewBufferString(t.Data);
+		_ref = t.Attr;
+		_i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(_i < _ref.$length)) { break; } */ if(!(_i < _ref.$length)) { $s = 2; continue; }
+			a = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), Attribute);
+			buf.WriteByte(32);
+			buf.WriteString(a.Key);
+			buf.WriteString("=\"");
+			_r = escape(buf, a.Val); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_r;
+			buf.WriteByte(34);
+			_i++;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return buf.String();
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Token.ptr.prototype.tagString }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f.a = a; $f.buf = buf; $f.t = t; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Token.prototype.tagString = function() { return this.$val.tagString(); };
+	Token.ptr.prototype.String = function() {
+		var _1, _r, _r$1, _r$2, _r$3, t, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; t = $f.t; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		t = this;
+			_1 = t.Type;
+			/* */ if (_1 === (0)) { $s = 2; continue; }
+			/* */ if (_1 === (1)) { $s = 3; continue; }
+			/* */ if (_1 === (2)) { $s = 4; continue; }
+			/* */ if (_1 === (3)) { $s = 5; continue; }
+			/* */ if (_1 === (4)) { $s = 6; continue; }
+			/* */ if (_1 === (5)) { $s = 7; continue; }
+			/* */ if (_1 === (6)) { $s = 8; continue; }
+			/* */ $s = 9; continue;
+			/* if (_1 === (0)) { */ case 2:
+				$s = -1; return "";
+			/* } else if (_1 === (1)) { */ case 3:
+				_r = EscapeString(t.Data); /* */ $s = 10; case 10: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				$s = -1; return _r;
+			/* } else if (_1 === (2)) { */ case 4:
+				_r$1 = $clone(t, Token).tagString(); /* */ $s = 11; case 11: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+				$s = -1; return "<" + _r$1 + ">";
+			/* } else if (_1 === (3)) { */ case 5:
+				_r$2 = $clone(t, Token).tagString(); /* */ $s = 12; case 12: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+				$s = -1; return "</" + _r$2 + ">";
+			/* } else if (_1 === (4)) { */ case 6:
+				_r$3 = $clone(t, Token).tagString(); /* */ $s = 13; case 13: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+				$s = -1; return "<" + _r$3 + "/>";
+			/* } else if (_1 === (5)) { */ case 7:
+				$s = -1; return "<!--" + t.Data + "-->";
+			/* } else if (_1 === (6)) { */ case 8:
+				$s = -1; return "<!DOCTYPE " + t.Data + ">";
+			/* } */ case 9:
+		case 1:
+		$s = -1; return "Invalid(" + strconv.Itoa(((t.Type >> 0))) + ")";
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Token.ptr.prototype.String }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f.t = t; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Token.prototype.String = function() { return this.$val.String(); };
+	Tokenizer.ptr.prototype.AllowCDATA = function(allowCDATA) {
+		var allowCDATA, z;
+		z = this;
+		z.allowCDATA = allowCDATA;
+	};
+	Tokenizer.prototype.AllowCDATA = function(allowCDATA) { return this.$val.AllowCDATA(allowCDATA); };
+	Tokenizer.ptr.prototype.NextIsNotRawText = function() {
+		var z;
+		z = this;
+		z.rawTag = "";
+	};
+	Tokenizer.prototype.NextIsNotRawText = function() { return this.$val.NextIsNotRawText(); };
+	Tokenizer.ptr.prototype.Err = function() {
+		var z;
+		z = this;
+		if (!((z.tt === 0))) {
+			return $ifaceNil;
+		}
+		return z.err;
+	};
+	Tokenizer.prototype.Err = function() { return this.$val.Err(); };
+	Tokenizer.ptr.prototype.readByte = function() {
+		var _i, _r, _ref, _tmp, _tmp$1, _tmp$2, _tuple, buf1, c, d, i, n, x, x$1, x$10, x$11, x$2, x$3, x$4, x$5, x$6, x$7, x$8, x$9, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _tmp = $f._tmp; _tmp$1 = $f._tmp$1; _tmp$2 = $f._tmp$2; _tuple = $f._tuple; buf1 = $f.buf1; c = $f.c; d = $f.d; i = $f.i; n = $f.n; x = $f.x; x$1 = $f.x$1; x$10 = $f.x$10; x$11 = $f.x$11; x$2 = $f.x$2; x$3 = $f.x$3; x$4 = $f.x$4; x$5 = $f.x$5; x$6 = $f.x$6; x$7 = $f.x$7; x$8 = $f.x$8; x$9 = $f.x$9; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		/* */ if (z.raw.end >= z.buf.$length) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (z.raw.end >= z.buf.$length) { */ case 1:
+			if (!($interfaceIsEqual(z.readErr, $ifaceNil))) {
+				z.err = z.readErr;
+				$s = -1; return 0;
+			}
+			c = z.buf.$capacity;
+			d = z.raw.end - z.raw.start >> 0;
+			buf1 = sliceType$3.nil;
+			if (($imul(2, d)) > c) {
+				buf1 = $makeSlice(sliceType$3, d, ($imul(2, c)));
+			} else {
+				buf1 = $subslice(z.buf, 0, d);
+			}
+			$copySlice(buf1, $subslice(z.buf, z.raw.start, z.raw.end));
+			x = z.raw.start;
+			if (!((x === 0))) {
+				z.data.start = z.data.start - (x) >> 0;
+				z.data.end = z.data.end - (x) >> 0;
+				z.pendingAttr[0].start = z.pendingAttr[0].start - (x) >> 0;
+				z.pendingAttr[0].end = z.pendingAttr[0].end - (x) >> 0;
+				z.pendingAttr[1].start = z.pendingAttr[1].start - (x) >> 0;
+				z.pendingAttr[1].end = z.pendingAttr[1].end - (x) >> 0;
+				_ref = z.attr;
+				_i = 0;
+				while (true) {
+					if (!(_i < _ref.$length)) { break; }
+					i = _i;
+					(x$2 = z.attr, ((i < 0 || i >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + i]))[0].start = (x$1 = z.attr, ((i < 0 || i >= x$1.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$1.$array[x$1.$offset + i]))[0].start - (x) >> 0;
+					(x$4 = z.attr, ((i < 0 || i >= x$4.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$4.$array[x$4.$offset + i]))[0].end = (x$3 = z.attr, ((i < 0 || i >= x$3.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$3.$array[x$3.$offset + i]))[0].end - (x) >> 0;
+					(x$6 = z.attr, ((i < 0 || i >= x$6.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$6.$array[x$6.$offset + i]))[1].start = (x$5 = z.attr, ((i < 0 || i >= x$5.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$5.$array[x$5.$offset + i]))[1].start - (x) >> 0;
+					(x$8 = z.attr, ((i < 0 || i >= x$8.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$8.$array[x$8.$offset + i]))[1].end = (x$7 = z.attr, ((i < 0 || i >= x$7.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$7.$array[x$7.$offset + i]))[1].end - (x) >> 0;
+					_i++;
+				}
+			}
+			_tmp = 0;
+			_tmp$1 = d;
+			_tmp$2 = $subslice(buf1, 0, d);
+			z.raw.start = _tmp;
+			z.raw.end = _tmp$1;
+			z.buf = _tmp$2;
+			n = 0;
+			_r = readAtLeastOneByte(z.r, $subslice(buf1, d, buf1.$capacity)); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_tuple = _r;
+			n = _tuple[0];
+			z.readErr = _tuple[1];
+			if (n === 0) {
+				z.err = z.readErr;
+				$s = -1; return 0;
+			}
+			z.buf = $subslice(buf1, 0, (d + n >> 0));
+		/* } */ case 2:
+		x$11 = (x$9 = z.buf, x$10 = z.raw.end, ((x$10 < 0 || x$10 >= x$9.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$9.$array[x$9.$offset + x$10]));
+		z.raw.end = z.raw.end + (1) >> 0;
+		if (z.maxBuf > 0 && (z.raw.end - z.raw.start >> 0) >= z.maxBuf) {
+			z.err = $pkg.ErrBufferExceeded;
+			$s = -1; return 0;
+		}
+		$s = -1; return x$11;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readByte }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f._tmp$2 = _tmp$2; $f._tuple = _tuple; $f.buf1 = buf1; $f.c = c; $f.d = d; $f.i = i; $f.n = n; $f.x = x; $f.x$1 = x$1; $f.x$10 = x$10; $f.x$11 = x$11; $f.x$2 = x$2; $f.x$3 = x$3; $f.x$4 = x$4; $f.x$5 = x$5; $f.x$6 = x$6; $f.x$7 = x$7; $f.x$8 = x$8; $f.x$9 = x$9; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readByte = function() { return this.$val.readByte(); };
+	Tokenizer.ptr.prototype.Buffered = function() {
+		var z;
+		z = this;
+		return $subslice(z.buf, z.raw.end);
+	};
+	Tokenizer.prototype.Buffered = function() { return this.$val.Buffered(); };
+	readAtLeastOneByte = function(r, b) {
+		var _r, _tuple, b, err, i, n, r, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _tuple = $f._tuple; b = $f.b; err = $f.err; i = $f.i; n = $f.n; r = $f.r; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(i < 100)) { break; } */ if(!(i < 100)) { $s = 2; continue; }
+			_r = r.Read(b); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			_tuple = _r;
+			n = _tuple[0];
+			err = _tuple[1];
+			if (!((n === 0)) || !($interfaceIsEqual(err, $ifaceNil))) {
+				$s = -1; return [n, err];
+			}
+			i = i + (1) >> 0;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return [0, io.ErrNoProgress];
+		/* */ } return; } if ($f === undefined) { $f = { $blk: readAtLeastOneByte }; } $f._r = _r; $f._tuple = _tuple; $f.b = b; $f.err = err; $f.i = i; $f.n = n; $f.r = r; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.ptr.prototype.skipWhiteSpace = function() {
+		var _1, _r, c, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; c = $f.c; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* while (true) { */ case 1:
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				$s = -1; return;
+			}
+			_1 = c;
+			if ((_1 === (32)) || (_1 === (10)) || (_1 === (13)) || (_1 === (9)) || (_1 === (12))) {
+			} else {
+				z.raw.end = z.raw.end - (1) >> 0;
+				$s = -1; return;
+			}
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.skipWhiteSpace }; } $f._1 = _1; $f._r = _r; $f.c = c; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.skipWhiteSpace = function() { return this.$val.skipWhiteSpace(); };
+	Tokenizer.ptr.prototype.readRawOrRCDATA = function() {
+		var _r, _r$1, _r$2, c, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; c = $f.c; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		/* */ if (z.rawTag === "script") { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (z.rawTag === "script") { */ case 1:
+			$r = z.readScript(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			z.textIsRaw = true;
+			z.rawTag = "";
+			$s = -1; return;
+		/* } */ case 2:
+		/* while (true) { */ case 4:
+			_r = z.readByte(); /* */ $s = 6; case 6: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				/* break loop; */ $s = 5; continue s;
+			}
+			/* */ if (!((c === 60))) { $s = 7; continue; }
+			/* */ $s = 8; continue;
+			/* if (!((c === 60))) { */ case 7:
+				/* continue loop; */ $s = 4; continue s;
+			/* } */ case 8:
+			_r$1 = z.readByte(); /* */ $s = 9; case 9: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			c = _r$1;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				/* break loop; */ $s = 5; continue s;
+			}
+			/* */ if (!((c === 47))) { $s = 10; continue; }
+			/* */ $s = 11; continue;
+			/* if (!((c === 47))) { */ case 10:
+				/* continue loop; */ $s = 4; continue s;
+			/* } */ case 11:
+			_r$2 = z.readRawEndTag(); /* */ $s = 14; case 14: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+			/* */ if (_r$2 || !($interfaceIsEqual(z.err, $ifaceNil))) { $s = 12; continue; }
+			/* */ $s = 13; continue;
+			/* if (_r$2 || !($interfaceIsEqual(z.err, $ifaceNil))) { */ case 12:
+				/* break loop; */ $s = 5; continue s;
+			/* } */ case 13:
+		/* } */ $s = 4; continue; case 5:
+		z.data.end = z.raw.end;
+		z.textIsRaw = !(z.rawTag === "textarea") && !(z.rawTag === "title");
+		z.rawTag = "";
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readRawOrRCDATA }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f.c = c; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readRawOrRCDATA = function() { return this.$val.readRawOrRCDATA(); };
+	Tokenizer.ptr.prototype.readRawEndTag = function() {
+		var _1, _r, _r$1, c, c$1, i, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; c = $f.c; c$1 = $f.c$1; i = $f.i; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(i < z.rawTag.length)) { break; } */ if(!(i < z.rawTag.length)) { $s = 2; continue; }
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				$s = -1; return false;
+			}
+			if (!((c === z.rawTag.charCodeAt(i))) && !((c === (z.rawTag.charCodeAt(i) - 32 << 24 >>> 24)))) {
+				z.raw.end = z.raw.end - (1) >> 0;
+				$s = -1; return false;
+			}
+			i = i + (1) >> 0;
+		/* } */ $s = 1; continue; case 2:
+		_r$1 = z.readByte(); /* */ $s = 4; case 4: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		c$1 = _r$1;
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return false;
+		}
+		_1 = c$1;
+		if ((_1 === (32)) || (_1 === (10)) || (_1 === (13)) || (_1 === (9)) || (_1 === (12)) || (_1 === (47)) || (_1 === (62))) {
+			z.raw.end = z.raw.end - ((3 + z.rawTag.length >> 0)) >> 0;
+			$s = -1; return true;
+		}
+		z.raw.end = z.raw.end - (1) >> 0;
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readRawEndTag }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f.c = c; $f.c$1 = c$1; $f.i = i; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readRawEndTag = function() { return this.$val.readRawEndTag(); };
+	Tokenizer.ptr.prototype.readScript = function() {
+		var _1, _2, _3, _4, _5, _6, _7, _8, _r, _r$1, _r$10, _r$11, _r$12, _r$13, _r$14, _r$15, _r$16, _r$2, _r$3, _r$4, _r$5, _r$6, _r$7, _r$8, _r$9, c, i, z, $s, $deferred, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _3 = $f._3; _4 = $f._4; _5 = $f._5; _6 = $f._6; _7 = $f._7; _8 = $f._8; _r = $f._r; _r$1 = $f._r$1; _r$10 = $f._r$10; _r$11 = $f._r$11; _r$12 = $f._r$12; _r$13 = $f._r$13; _r$14 = $f._r$14; _r$15 = $f._r$15; _r$16 = $f._r$16; _r$2 = $f._r$2; _r$3 = $f._r$3; _r$4 = $f._r$4; _r$5 = $f._r$5; _r$6 = $f._r$6; _r$7 = $f._r$7; _r$8 = $f._r$8; _r$9 = $f._r$9; c = $f.c; i = $f.i; z = $f.z; $s = $f.$s; $deferred = $f.$deferred; $r = $f.$r; } var $err = null; try { s: while (true) { switch ($s) { case 0: $deferred = []; $deferred.index = $curGoroutine.deferStack.length; $curGoroutine.deferStack.push($deferred);
+		z = [z];
+		z[0] = this;
+		$deferred.push([(function(z) { return function() {
+			z[0].data.end = z[0].raw.end;
+		}; })(z), []]);
+		c = 0;
+		/* scriptData: */ case 1:
+		_r = z[0].readByte(); /* */ $s = 2; case 2: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		c = _r;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* */ if (c === 60) { $s = 3; continue; }
+		/* */ $s = 4; continue;
+		/* if (c === 60) { */ case 3:
+			/* goto scriptDataLessThanSign */ $s = 5; continue;
+		/* } */ case 4:
+		/* goto scriptData */ $s = 1; continue;
+		/* scriptDataLessThanSign: */ case 5:
+		_r$1 = z[0].readByte(); /* */ $s = 6; case 6: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		c = _r$1;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_1 = c;
+			/* */ if (_1 === (47)) { $s = 8; continue; }
+			/* */ if (_1 === (33)) { $s = 9; continue; }
+			/* */ $s = 10; continue;
+			/* if (_1 === (47)) { */ case 8:
+				/* goto scriptDataEndTagOpen */ $s = 11; continue;
+				$s = 10; continue;
+			/* } else if (_1 === (33)) { */ case 9:
+				/* goto scriptDataEscapeStart */ $s = 12; continue;
+			/* } */ case 10:
+		case 7:
+		z[0].raw.end = z[0].raw.end - (1) >> 0;
+		/* goto scriptData */ $s = 1; continue;
+		/* scriptDataEndTagOpen: */ case 11:
+		_r$2 = z[0].readRawEndTag(); /* */ $s = 15; case 15: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+		/* */ if (_r$2 || !($interfaceIsEqual(z[0].err, $ifaceNil))) { $s = 13; continue; }
+		/* */ $s = 14; continue;
+		/* if (_r$2 || !($interfaceIsEqual(z[0].err, $ifaceNil))) { */ case 13:
+			$s = -1; return;
+		/* } */ case 14:
+		/* goto scriptData */ $s = 1; continue;
+		/* scriptDataEscapeStart: */ case 12:
+		_r$3 = z[0].readByte(); /* */ $s = 16; case 16: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+		c = _r$3;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* */ if (c === 45) { $s = 17; continue; }
+		/* */ $s = 18; continue;
+		/* if (c === 45) { */ case 17:
+			/* goto scriptDataEscapeStartDash */ $s = 19; continue;
+		/* } */ case 18:
+		z[0].raw.end = z[0].raw.end - (1) >> 0;
+		/* goto scriptData */ $s = 1; continue;
+		/* scriptDataEscapeStartDash: */ case 19:
+		_r$4 = z[0].readByte(); /* */ $s = 20; case 20: if($c) { $c = false; _r$4 = _r$4.$blk(); } if (_r$4 && _r$4.$blk !== undefined) { break s; }
+		c = _r$4;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* */ if (c === 45) { $s = 21; continue; }
+		/* */ $s = 22; continue;
+		/* if (c === 45) { */ case 21:
+			/* goto scriptDataEscapedDashDash */ $s = 23; continue;
+		/* } */ case 22:
+		z[0].raw.end = z[0].raw.end - (1) >> 0;
+		/* goto scriptData */ $s = 1; continue;
+		/* scriptDataEscaped: */ case 24:
+		_r$5 = z[0].readByte(); /* */ $s = 25; case 25: if($c) { $c = false; _r$5 = _r$5.$blk(); } if (_r$5 && _r$5.$blk !== undefined) { break s; }
+		c = _r$5;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_2 = c;
+			/* */ if (_2 === (45)) { $s = 27; continue; }
+			/* */ if (_2 === (60)) { $s = 28; continue; }
+			/* */ $s = 29; continue;
+			/* if (_2 === (45)) { */ case 27:
+				/* goto scriptDataEscapedDash */ $s = 30; continue;
+				$s = 29; continue;
+			/* } else if (_2 === (60)) { */ case 28:
+				/* goto scriptDataEscapedLessThanSign */ $s = 31; continue;
+			/* } */ case 29:
+		case 26:
+		/* goto scriptDataEscaped */ $s = 24; continue;
+		/* scriptDataEscapedDash: */ case 30:
+		_r$6 = z[0].readByte(); /* */ $s = 32; case 32: if($c) { $c = false; _r$6 = _r$6.$blk(); } if (_r$6 && _r$6.$blk !== undefined) { break s; }
+		c = _r$6;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_3 = c;
+			/* */ if (_3 === (45)) { $s = 34; continue; }
+			/* */ if (_3 === (60)) { $s = 35; continue; }
+			/* */ $s = 36; continue;
+			/* if (_3 === (45)) { */ case 34:
+				/* goto scriptDataEscapedDashDash */ $s = 23; continue;
+				$s = 36; continue;
+			/* } else if (_3 === (60)) { */ case 35:
+				/* goto scriptDataEscapedLessThanSign */ $s = 31; continue;
+			/* } */ case 36:
+		case 33:
+		/* goto scriptDataEscaped */ $s = 24; continue;
+		/* scriptDataEscapedDashDash: */ case 23:
+		_r$7 = z[0].readByte(); /* */ $s = 37; case 37: if($c) { $c = false; _r$7 = _r$7.$blk(); } if (_r$7 && _r$7.$blk !== undefined) { break s; }
+		c = _r$7;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_4 = c;
+			/* */ if (_4 === (45)) { $s = 39; continue; }
+			/* */ if (_4 === (60)) { $s = 40; continue; }
+			/* */ if (_4 === (62)) { $s = 41; continue; }
+			/* */ $s = 42; continue;
+			/* if (_4 === (45)) { */ case 39:
+				/* goto scriptDataEscapedDashDash */ $s = 23; continue;
+				$s = 42; continue;
+			/* } else if (_4 === (60)) { */ case 40:
+				/* goto scriptDataEscapedLessThanSign */ $s = 31; continue;
+				$s = 42; continue;
+			/* } else if (_4 === (62)) { */ case 41:
+				/* goto scriptData */ $s = 1; continue;
+			/* } */ case 42:
+		case 38:
+		/* goto scriptDataEscaped */ $s = 24; continue;
+		/* scriptDataEscapedLessThanSign: */ case 31:
+		_r$8 = z[0].readByte(); /* */ $s = 43; case 43: if($c) { $c = false; _r$8 = _r$8.$blk(); } if (_r$8 && _r$8.$blk !== undefined) { break s; }
+		c = _r$8;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* */ if (c === 47) { $s = 44; continue; }
+		/* */ $s = 45; continue;
+		/* if (c === 47) { */ case 44:
+			/* goto scriptDataEscapedEndTagOpen */ $s = 46; continue;
+		/* } */ case 45:
+		/* */ if (97 <= c && c <= 122 || 65 <= c && c <= 90) { $s = 47; continue; }
+		/* */ $s = 48; continue;
+		/* if (97 <= c && c <= 122 || 65 <= c && c <= 90) { */ case 47:
+			/* goto scriptDataDoubleEscapeStart */ $s = 49; continue;
+		/* } */ case 48:
+		z[0].raw.end = z[0].raw.end - (1) >> 0;
+		/* goto scriptData */ $s = 1; continue;
+		/* scriptDataEscapedEndTagOpen: */ case 46:
+		_r$9 = z[0].readRawEndTag(); /* */ $s = 52; case 52: if($c) { $c = false; _r$9 = _r$9.$blk(); } if (_r$9 && _r$9.$blk !== undefined) { break s; }
+		/* */ if (_r$9 || !($interfaceIsEqual(z[0].err, $ifaceNil))) { $s = 50; continue; }
+		/* */ $s = 51; continue;
+		/* if (_r$9 || !($interfaceIsEqual(z[0].err, $ifaceNil))) { */ case 50:
+			$s = -1; return;
+		/* } */ case 51:
+		/* goto scriptDataEscaped */ $s = 24; continue;
+		/* scriptDataDoubleEscapeStart: */ case 49:
+		z[0].raw.end = z[0].raw.end - (1) >> 0;
+		i = 0;
+		/* while (true) { */ case 53:
+			/* if (!(i < 6)) { break; } */ if(!(i < 6)) { $s = 54; continue; }
+			_r$10 = z[0].readByte(); /* */ $s = 55; case 55: if($c) { $c = false; _r$10 = _r$10.$blk(); } if (_r$10 && _r$10.$blk !== undefined) { break s; }
+			c = _r$10;
+			if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+				$s = -1; return;
+			}
+			/* */ if (!((c === "script".charCodeAt(i))) && !((c === "SCRIPT".charCodeAt(i)))) { $s = 56; continue; }
+			/* */ $s = 57; continue;
+			/* if (!((c === "script".charCodeAt(i))) && !((c === "SCRIPT".charCodeAt(i)))) { */ case 56:
+				z[0].raw.end = z[0].raw.end - (1) >> 0;
+				/* goto scriptDataEscaped */ $s = 24; continue;
+			/* } */ case 57:
+			i = i + (1) >> 0;
+		/* } */ $s = 53; continue; case 54:
+		_r$11 = z[0].readByte(); /* */ $s = 58; case 58: if($c) { $c = false; _r$11 = _r$11.$blk(); } if (_r$11 && _r$11.$blk !== undefined) { break s; }
+		c = _r$11;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_5 = c;
+			/* */ if ((_5 === (32)) || (_5 === (10)) || (_5 === (13)) || (_5 === (9)) || (_5 === (12)) || (_5 === (47)) || (_5 === (62))) { $s = 60; continue; }
+			/* */ $s = 61; continue;
+			/* if ((_5 === (32)) || (_5 === (10)) || (_5 === (13)) || (_5 === (9)) || (_5 === (12)) || (_5 === (47)) || (_5 === (62))) { */ case 60:
+				/* goto scriptDataDoubleEscaped */ $s = 62; continue;
+			/* } */ case 61:
+		case 59:
+		z[0].raw.end = z[0].raw.end - (1) >> 0;
+		/* goto scriptDataEscaped */ $s = 24; continue;
+		/* scriptDataDoubleEscaped: */ case 62:
+		_r$12 = z[0].readByte(); /* */ $s = 63; case 63: if($c) { $c = false; _r$12 = _r$12.$blk(); } if (_r$12 && _r$12.$blk !== undefined) { break s; }
+		c = _r$12;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_6 = c;
+			/* */ if (_6 === (45)) { $s = 65; continue; }
+			/* */ if (_6 === (60)) { $s = 66; continue; }
+			/* */ $s = 67; continue;
+			/* if (_6 === (45)) { */ case 65:
+				/* goto scriptDataDoubleEscapedDash */ $s = 68; continue;
+				$s = 67; continue;
+			/* } else if (_6 === (60)) { */ case 66:
+				/* goto scriptDataDoubleEscapedLessThanSign */ $s = 69; continue;
+			/* } */ case 67:
+		case 64:
+		/* goto scriptDataDoubleEscaped */ $s = 62; continue;
+		/* scriptDataDoubleEscapedDash: */ case 68:
+		_r$13 = z[0].readByte(); /* */ $s = 70; case 70: if($c) { $c = false; _r$13 = _r$13.$blk(); } if (_r$13 && _r$13.$blk !== undefined) { break s; }
+		c = _r$13;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_7 = c;
+			/* */ if (_7 === (45)) { $s = 72; continue; }
+			/* */ if (_7 === (60)) { $s = 73; continue; }
+			/* */ $s = 74; continue;
+			/* if (_7 === (45)) { */ case 72:
+				/* goto scriptDataDoubleEscapedDashDash */ $s = 75; continue;
+				$s = 74; continue;
+			/* } else if (_7 === (60)) { */ case 73:
+				/* goto scriptDataDoubleEscapedLessThanSign */ $s = 69; continue;
+			/* } */ case 74:
+		case 71:
+		/* goto scriptDataDoubleEscaped */ $s = 62; continue;
+		/* scriptDataDoubleEscapedDashDash: */ case 75:
+		_r$14 = z[0].readByte(); /* */ $s = 76; case 76: if($c) { $c = false; _r$14 = _r$14.$blk(); } if (_r$14 && _r$14.$blk !== undefined) { break s; }
+		c = _r$14;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_8 = c;
+			/* */ if (_8 === (45)) { $s = 78; continue; }
+			/* */ if (_8 === (60)) { $s = 79; continue; }
+			/* */ if (_8 === (62)) { $s = 80; continue; }
+			/* */ $s = 81; continue;
+			/* if (_8 === (45)) { */ case 78:
+				/* goto scriptDataDoubleEscapedDashDash */ $s = 75; continue;
+				$s = 81; continue;
+			/* } else if (_8 === (60)) { */ case 79:
+				/* goto scriptDataDoubleEscapedLessThanSign */ $s = 69; continue;
+				$s = 81; continue;
+			/* } else if (_8 === (62)) { */ case 80:
+				/* goto scriptData */ $s = 1; continue;
+			/* } */ case 81:
+		case 77:
+		/* goto scriptDataDoubleEscaped */ $s = 62; continue;
+		/* scriptDataDoubleEscapedLessThanSign: */ case 69:
+		_r$15 = z[0].readByte(); /* */ $s = 82; case 82: if($c) { $c = false; _r$15 = _r$15.$blk(); } if (_r$15 && _r$15.$blk !== undefined) { break s; }
+		c = _r$15;
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* */ if (c === 47) { $s = 83; continue; }
+		/* */ $s = 84; continue;
+		/* if (c === 47) { */ case 83:
+			/* goto scriptDataDoubleEscapeEnd */ $s = 85; continue;
+		/* } */ case 84:
+		z[0].raw.end = z[0].raw.end - (1) >> 0;
+		/* goto scriptDataDoubleEscaped */ $s = 62; continue;
+		/* scriptDataDoubleEscapeEnd: */ case 85:
+		_r$16 = z[0].readRawEndTag(); /* */ $s = 88; case 88: if($c) { $c = false; _r$16 = _r$16.$blk(); } if (_r$16 && _r$16.$blk !== undefined) { break s; }
+		/* */ if (_r$16) { $s = 86; continue; }
+		/* */ $s = 87; continue;
+		/* if (_r$16) { */ case 86:
+			z[0].raw.end = z[0].raw.end + (9) >> 0;
+			/* goto scriptDataEscaped */ $s = 24; continue;
+		/* } */ case 87:
+		if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* goto scriptDataDoubleEscaped */ $s = 62; continue;
+		$s = -1; return;
+		/* */ } return; } } catch(err) { $err = err; $s = -1; } finally { $callDeferred($deferred, $err); if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readScript }; } $f._1 = _1; $f._2 = _2; $f._3 = _3; $f._4 = _4; $f._5 = _5; $f._6 = _6; $f._7 = _7; $f._8 = _8; $f._r = _r; $f._r$1 = _r$1; $f._r$10 = _r$10; $f._r$11 = _r$11; $f._r$12 = _r$12; $f._r$13 = _r$13; $f._r$14 = _r$14; $f._r$15 = _r$15; $f._r$16 = _r$16; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._r$4 = _r$4; $f._r$5 = _r$5; $f._r$6 = _r$6; $f._r$7 = _r$7; $f._r$8 = _r$8; $f._r$9 = _r$9; $f.c = c; $f.i = i; $f.z = z; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
+	};
+	Tokenizer.prototype.readScript = function() { return this.$val.readScript(); };
+	Tokenizer.ptr.prototype.readComment = function() {
+		var _1, _r, _r$1, c, dashCount, z, $s, $deferred, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; c = $f.c; dashCount = $f.dashCount; z = $f.z; $s = $f.$s; $deferred = $f.$deferred; $r = $f.$r; } var $err = null; try { s: while (true) { switch ($s) { case 0: $deferred = []; $deferred.index = $curGoroutine.deferStack.length; $curGoroutine.deferStack.push($deferred);
+		z = [z];
+		z[0] = this;
+		z[0].data.start = z[0].raw.end;
+		$deferred.push([(function(z) { return function() {
+			if (z[0].data.end < z[0].data.start) {
+				z[0].data.end = z[0].data.start;
+			}
+		}; })(z), []]);
+		dashCount = 2;
+		/* while (true) { */ case 1:
+			_r = z[0].readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+				if (dashCount > 2) {
+					dashCount = 2;
+				}
+				z[0].data.end = z[0].raw.end - dashCount >> 0;
+				$s = -1; return;
+			}
+				_1 = c;
+				/* */ if (_1 === (45)) { $s = 5; continue; }
+				/* */ if (_1 === (62)) { $s = 6; continue; }
+				/* */ if (_1 === (33)) { $s = 7; continue; }
+				/* */ $s = 8; continue;
+				/* if (_1 === (45)) { */ case 5:
+					dashCount = dashCount + (1) >> 0;
+					/* continue; */ $s = 1; continue;
+					$s = 8; continue;
+				/* } else if (_1 === (62)) { */ case 6:
+					if (dashCount >= 2) {
+						z[0].data.end = z[0].raw.end - 3 >> 0;
+						$s = -1; return;
+					}
+					$s = 8; continue;
+				/* } else if (_1 === (33)) { */ case 7:
+					/* */ if (dashCount >= 2) { $s = 9; continue; }
+					/* */ $s = 10; continue;
+					/* if (dashCount >= 2) { */ case 9:
+						_r$1 = z[0].readByte(); /* */ $s = 11; case 11: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+						c = _r$1;
+						if (!($interfaceIsEqual(z[0].err, $ifaceNil))) {
+							z[0].data.end = z[0].raw.end;
+							$s = -1; return;
+						}
+						if (c === 62) {
+							z[0].data.end = z[0].raw.end - 4 >> 0;
+							$s = -1; return;
+						}
+					/* } */ case 10:
+				/* } */ case 8:
+			case 4:
+			dashCount = 0;
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return;
+		/* */ } return; } } catch(err) { $err = err; $s = -1; } finally { $callDeferred($deferred, $err); if($curGoroutine.asleep) { if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readComment }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f.c = c; $f.dashCount = dashCount; $f.z = z; $f.$s = $s; $f.$deferred = $deferred; $f.$r = $r; return $f; } }
+	};
+	Tokenizer.prototype.readComment = function() { return this.$val.readComment(); };
+	Tokenizer.ptr.prototype.readUntilCloseAngle = function() {
+		var _r, c, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; c = $f.c; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		z.data.start = z.raw.end;
+		/* while (true) { */ case 1:
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				z.data.end = z.raw.end;
+				$s = -1; return;
+			}
+			if (c === 62) {
+				z.data.end = z.raw.end - 1 >> 0;
+				$s = -1; return;
+			}
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readUntilCloseAngle }; } $f._r = _r; $f.c = c; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readUntilCloseAngle = function() { return this.$val.readUntilCloseAngle(); };
+	Tokenizer.ptr.prototype.readMarkupDeclaration = function() {
+		var _r, _r$1, _r$2, _v, c, i, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _v = $f._v; c = $f.c; i = $f.i; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		z.data.start = z.raw.end;
+		c = arrayType$2.zero();
+		i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(i < 2)) { break; } */ if(!(i < 2)) { $s = 2; continue; }
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			((i < 0 || i >= c.length) ? ($throwRuntimeError("index out of range"), undefined) : c[i] = _r);
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				z.data.end = z.raw.end;
+				$s = -1; return 5;
+			}
+			i = i + (1) >> 0;
+		/* } */ $s = 1; continue; case 2:
+		/* */ if ((c[0] === 45) && (c[1] === 45)) { $s = 4; continue; }
+		/* */ $s = 5; continue;
+		/* if ((c[0] === 45) && (c[1] === 45)) { */ case 4:
+			$r = z.readComment(); /* */ $s = 6; case 6: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			$s = -1; return 5;
+		/* } */ case 5:
+		z.raw.end = z.raw.end - (2) >> 0;
+		_r$1 = z.readDoctype(); /* */ $s = 9; case 9: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		/* */ if (_r$1) { $s = 7; continue; }
+		/* */ $s = 8; continue;
+		/* if (_r$1) { */ case 7:
+			$s = -1; return 6;
+		/* } */ case 8:
+		if (!(z.allowCDATA)) { _v = false; $s = 12; continue s; }
+		_r$2 = z.readCDATA(); /* */ $s = 13; case 13: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+		_v = _r$2; case 12:
+		/* */ if (_v) { $s = 10; continue; }
+		/* */ $s = 11; continue;
+		/* if (_v) { */ case 10:
+			z.convertNUL = true;
+			$s = -1; return 1;
+		/* } */ case 11:
+		$r = z.readUntilCloseAngle(); /* */ $s = 14; case 14: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return 5;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readMarkupDeclaration }; } $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._v = _v; $f.c = c; $f.i = i; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readMarkupDeclaration = function() { return this.$val.readMarkupDeclaration(); };
+	Tokenizer.ptr.prototype.readDoctype = function() {
+		var _r, c, i, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; c = $f.c; i = $f.i; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(i < 7)) { break; } */ if(!(i < 7)) { $s = 2; continue; }
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				z.data.end = z.raw.end;
+				$s = -1; return false;
+			}
+			if (!((c === "DOCTYPE".charCodeAt(i))) && !((c === ("DOCTYPE".charCodeAt(i) + 32 << 24 >>> 24)))) {
+				z.raw.end = z.data.start;
+				$s = -1; return false;
+			}
+			i = i + (1) >> 0;
+		/* } */ $s = 1; continue; case 2:
+		$r = z.skipWhiteSpace(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			z.data.start = z.raw.end;
+			z.data.end = z.raw.end;
+			$s = -1; return true;
+		}
+		$r = z.readUntilCloseAngle(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$s = -1; return true;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readDoctype }; } $f._r = _r; $f.c = c; $f.i = i; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readDoctype = function() { return this.$val.readDoctype(); };
+	Tokenizer.ptr.prototype.readCDATA = function() {
+		var _1, _r, _r$1, brackets, c, c$1, i, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; brackets = $f.brackets; c = $f.c; c$1 = $f.c$1; i = $f.i; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		i = 0;
+		/* while (true) { */ case 1:
+			/* if (!(i < 7)) { break; } */ if(!(i < 7)) { $s = 2; continue; }
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				z.data.end = z.raw.end;
+				$s = -1; return false;
+			}
+			if (!((c === "[CDATA[".charCodeAt(i)))) {
+				z.raw.end = z.data.start;
+				$s = -1; return false;
+			}
+			i = i + (1) >> 0;
+		/* } */ $s = 1; continue; case 2:
+		z.data.start = z.raw.end;
+		brackets = 0;
+		/* while (true) { */ case 4:
+			_r$1 = z.readByte(); /* */ $s = 6; case 6: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			c$1 = _r$1;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				z.data.end = z.raw.end;
+				$s = -1; return true;
+			}
+			_1 = c$1;
+			if (_1 === (93)) {
+				brackets = brackets + (1) >> 0;
+			} else if (_1 === (62)) {
+				if (brackets >= 2) {
+					z.data.end = z.raw.end - 3 >> 0;
+					$s = -1; return true;
+				}
+				brackets = 0;
+			} else {
+				brackets = 0;
+			}
+		/* } */ $s = 4; continue; case 5:
+		$s = -1; return false;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readCDATA }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f.brackets = brackets; $f.c = c; $f.c$1 = c$1; $f.i = i; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readCDATA = function() { return this.$val.readCDATA(); };
+	Tokenizer.ptr.prototype.startTagIn = function(ss) {
+		var _i, _ref, c, i, s, ss, x, x$1, z;
+		z = this;
+		_ref = ss;
+		_i = 0;
+		loop:
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			s = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (!(((z.data.end - z.data.start >> 0) === s.length))) {
+				_i++;
+				continue loop;
+			}
+			i = 0;
+			while (true) {
+				if (!(i < s.length)) { break; }
+				c = (x = z.buf, x$1 = z.data.start + i >> 0, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+				if (65 <= c && c <= 90) {
+					c = c + (32) << 24 >>> 24;
+				}
+				if (!((c === s.charCodeAt(i)))) {
+					_i++;
+					continue loop;
+				}
+				i = i + (1) >> 0;
+			}
+			return true;
+		}
+		return false;
+	};
+	Tokenizer.prototype.startTagIn = function(ss) { return this.$val.startTagIn(ss); };
+	Tokenizer.ptr.prototype.readStartTag = function() {
+		var _1, _r, _tmp, _tmp$1, c, raw, x, x$1, x$2, x$3, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _tmp = $f._tmp; _tmp$1 = $f._tmp$1; c = $f.c; raw = $f.raw; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; x$3 = $f.x$3; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		$r = z.readTag(true); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return 0;
+		}
+		_tmp = (x = z.buf, x$1 = z.data.start, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+		_tmp$1 = false;
+		c = _tmp;
+		raw = _tmp$1;
+		if (65 <= c && c <= 90) {
+			c = c + (32) << 24 >>> 24;
+		}
+		_1 = c;
+		if (_1 === (105)) {
+			raw = z.startTagIn(new sliceType(["iframe"]));
+		} else if (_1 === (110)) {
+			raw = z.startTagIn(new sliceType(["noembed", "noframes", "noscript"]));
+		} else if (_1 === (112)) {
+			raw = z.startTagIn(new sliceType(["plaintext"]));
+		} else if (_1 === (115)) {
+			raw = z.startTagIn(new sliceType(["script", "style"]));
+		} else if (_1 === (116)) {
+			raw = z.startTagIn(new sliceType(["textarea", "title"]));
+		} else if (_1 === (120)) {
+			raw = z.startTagIn(new sliceType(["xmp"]));
+		}
+		/* */ if (raw) { $s = 2; continue; }
+		/* */ $s = 3; continue;
+		/* if (raw) { */ case 2:
+			_r = strings.ToLower(($bytesToString($subslice(z.buf, z.data.start, z.data.end)))); /* */ $s = 4; case 4: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			z.rawTag = _r;
+		/* } */ case 3:
+		if ($interfaceIsEqual(z.err, $ifaceNil) && ((x$2 = z.buf, x$3 = z.raw.end - 2 >> 0, ((x$3 < 0 || x$3 >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + x$3])) === 47)) {
+			$s = -1; return 4;
+		}
+		$s = -1; return 2;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readStartTag }; } $f._1 = _1; $f._r = _r; $f._tmp = _tmp; $f._tmp$1 = _tmp$1; $f.c = c; $f.raw = raw; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readStartTag = function() { return this.$val.readStartTag(); };
+	Tokenizer.ptr.prototype.readTag = function(saveAttr) {
+		var _r, c, saveAttr, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; c = $f.c; saveAttr = $f.saveAttr; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		z.attr = $subslice(z.attr, 0, 0);
+		z.nAttrReturned = 0;
+		$r = z.readTagName(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = z.skipWhiteSpace(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		/* while (true) { */ case 3:
+			_r = z.readByte(); /* */ $s = 5; case 5: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil)) || (c === 62)) {
+				/* break; */ $s = 4; continue;
+			}
+			z.raw.end = z.raw.end - (1) >> 0;
+			$r = z.readTagAttrKey(); /* */ $s = 6; case 6: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			$r = z.readTagAttrVal(); /* */ $s = 7; case 7: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			if (saveAttr && !((z.pendingAttr[0].start === z.pendingAttr[0].end))) {
+				z.attr = $append(z.attr, z.pendingAttr);
+			}
+			$r = z.skipWhiteSpace(); /* */ $s = 8; case 8: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				/* break; */ $s = 4; continue;
+			}
+		/* } */ $s = 3; continue; case 4:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readTag }; } $f._r = _r; $f.c = c; $f.saveAttr = saveAttr; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readTag = function(saveAttr) { return this.$val.readTag(saveAttr); };
+	Tokenizer.ptr.prototype.readTagName = function() {
+		var _1, _r, c, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; c = $f.c; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		z.data.start = z.raw.end - 1 >> 0;
+		/* while (true) { */ case 1:
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				z.data.end = z.raw.end;
+				$s = -1; return;
+			}
+			_1 = c;
+			if ((_1 === (32)) || (_1 === (10)) || (_1 === (13)) || (_1 === (9)) || (_1 === (12))) {
+				z.data.end = z.raw.end - 1 >> 0;
+				$s = -1; return;
+			} else if ((_1 === (47)) || (_1 === (62))) {
+				z.raw.end = z.raw.end - (1) >> 0;
+				z.data.end = z.raw.end;
+				$s = -1; return;
+			}
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readTagName }; } $f._1 = _1; $f._r = _r; $f.c = c; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readTagName = function() { return this.$val.readTagName(); };
+	Tokenizer.ptr.prototype.readTagAttrKey = function() {
+		var _1, _r, c, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; c = $f.c; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		z.pendingAttr[0].start = z.raw.end;
+		/* while (true) { */ case 1:
+			_r = z.readByte(); /* */ $s = 3; case 3: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			c = _r;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				z.pendingAttr[0].end = z.raw.end;
+				$s = -1; return;
+			}
+			_1 = c;
+			if ((_1 === (32)) || (_1 === (10)) || (_1 === (13)) || (_1 === (9)) || (_1 === (12)) || (_1 === (47))) {
+				z.pendingAttr[0].end = z.raw.end - 1 >> 0;
+				$s = -1; return;
+			} else if ((_1 === (61)) || (_1 === (62))) {
+				z.raw.end = z.raw.end - (1) >> 0;
+				z.pendingAttr[0].end = z.raw.end;
+				$s = -1; return;
+			}
+		/* } */ $s = 1; continue; case 2:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readTagAttrKey }; } $f._1 = _1; $f._r = _r; $f.c = c; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readTagAttrKey = function() { return this.$val.readTagAttrKey(); };
+	Tokenizer.ptr.prototype.readTagAttrVal = function() {
+		var _1, _2, _r, _r$1, _r$2, _r$3, c, c$1, c$2, quote, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _2 = $f._2; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; c = $f.c; c$1 = $f.c$1; c$2 = $f.c$2; quote = $f.quote; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		z.pendingAttr[1].start = z.raw.end;
+		z.pendingAttr[1].end = z.raw.end;
+		$r = z.skipWhiteSpace(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		_r = z.readByte(); /* */ $s = 2; case 2: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		c = _r;
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		if (!((c === 61))) {
+			z.raw.end = z.raw.end - (1) >> 0;
+			$s = -1; return;
+		}
+		$r = z.skipWhiteSpace(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return;
+		}
+		_r$1 = z.readByte(); /* */ $s = 4; case 4: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		quote = _r$1;
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			$s = -1; return;
+		}
+			_1 = quote;
+			/* */ if (_1 === (62)) { $s = 6; continue; }
+			/* */ if ((_1 === (39)) || (_1 === (34))) { $s = 7; continue; }
+			/* */ $s = 8; continue;
+			/* if (_1 === (62)) { */ case 6:
+				z.raw.end = z.raw.end - (1) >> 0;
+				$s = -1; return;
+			/* } else if ((_1 === (39)) || (_1 === (34))) { */ case 7:
+				z.pendingAttr[1].start = z.raw.end;
+				/* while (true) { */ case 10:
+					_r$2 = z.readByte(); /* */ $s = 12; case 12: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+					c$1 = _r$2;
+					if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+						z.pendingAttr[1].end = z.raw.end;
+						$s = -1; return;
+					}
+					if (c$1 === quote) {
+						z.pendingAttr[1].end = z.raw.end - 1 >> 0;
+						$s = -1; return;
+					}
+				/* } */ $s = 10; continue; case 11:
+				$s = 9; continue;
+			/* } else { */ case 8:
+				z.pendingAttr[1].start = z.raw.end - 1 >> 0;
+				/* while (true) { */ case 13:
+					_r$3 = z.readByte(); /* */ $s = 15; case 15: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+					c$2 = _r$3;
+					if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+						z.pendingAttr[1].end = z.raw.end;
+						$s = -1; return;
+					}
+					_2 = c$2;
+					if ((_2 === (32)) || (_2 === (10)) || (_2 === (13)) || (_2 === (9)) || (_2 === (12))) {
+						z.pendingAttr[1].end = z.raw.end - 1 >> 0;
+						$s = -1; return;
+					} else if (_2 === (62)) {
+						z.raw.end = z.raw.end - (1) >> 0;
+						z.pendingAttr[1].end = z.raw.end;
+						$s = -1; return;
+					}
+				/* } */ $s = 13; continue; case 14:
+			/* } */ case 9:
+		case 5:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.readTagAttrVal }; } $f._1 = _1; $f._2 = _2; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f.c = c; $f.c$1 = c$1; $f.c$2 = c$2; $f.quote = quote; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.readTagAttrVal = function() { return this.$val.readTagAttrVal(); };
+	Tokenizer.ptr.prototype.Next = function() {
+		var _1, _r, _r$1, _r$2, _r$3, _r$4, _r$5, c, tokenType, x, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; _r$1 = $f._r$1; _r$2 = $f._r$2; _r$3 = $f._r$3; _r$4 = $f._r$4; _r$5 = $f._r$5; c = $f.c; tokenType = $f.tokenType; x = $f.x; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = this;
+		z.raw.start = z.raw.end;
+		z.data.start = z.raw.end;
+		z.data.end = z.raw.end;
+		if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+			z.tt = 0;
+			$s = -1; return z.tt;
+		}
+		/* */ if (!(z.rawTag === "")) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (!(z.rawTag === "")) { */ case 1:
+			/* */ if (z.rawTag === "plaintext") { $s = 3; continue; }
+			/* */ $s = 4; continue;
+			/* if (z.rawTag === "plaintext") { */ case 3:
+				/* while (true) { */ case 6:
+					/* if (!($interfaceIsEqual(z.err, $ifaceNil))) { break; } */ if(!($interfaceIsEqual(z.err, $ifaceNil))) { $s = 7; continue; }
+					_r = z.readByte(); /* */ $s = 8; case 8: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+					_r;
+				/* } */ $s = 6; continue; case 7:
+				z.data.end = z.raw.end;
+				z.textIsRaw = true;
+				$s = 5; continue;
+			/* } else { */ case 4:
+				$r = z.readRawOrRCDATA(); /* */ $s = 9; case 9: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			/* } */ case 5:
+			if (z.data.end > z.data.start) {
+				z.tt = 1;
+				z.convertNUL = true;
+				$s = -1; return z.tt;
+			}
+		/* } */ case 2:
+		z.textIsRaw = false;
+		z.convertNUL = false;
+		/* while (true) { */ case 10:
+			_r$1 = z.readByte(); /* */ $s = 12; case 12: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+			c = _r$1;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				/* break loop; */ $s = 11; continue s;
+			}
+			/* */ if (!((c === 60))) { $s = 13; continue; }
+			/* */ $s = 14; continue;
+			/* if (!((c === 60))) { */ case 13:
+				/* continue loop; */ $s = 10; continue s;
+			/* } */ case 14:
+			_r$2 = z.readByte(); /* */ $s = 15; case 15: if($c) { $c = false; _r$2 = _r$2.$blk(); } if (_r$2 && _r$2.$blk !== undefined) { break s; }
+			c = _r$2;
+			if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+				/* break loop; */ $s = 11; continue s;
+			}
+			tokenType = 0;
+				if (97 <= c && c <= 122 || 65 <= c && c <= 90) {
+					tokenType = 2;
+				} else if ((c === 47)) {
+					tokenType = 3;
+				} else if ((c === 33) || (c === 63)) {
+					tokenType = 5;
+				} else {
+					z.raw.end = z.raw.end - (1) >> 0;
+					/* continue; */ $s = 10; continue;
+				}
+			case 16:
+			x = z.raw.end - 2 >> 0;
+			if (z.raw.start < x) {
+				z.raw.end = x;
+				z.data.end = x;
+				z.tt = 1;
+				$s = -1; return z.tt;
+			}
+				_1 = tokenType;
+				/* */ if (_1 === (2)) { $s = 18; continue; }
+				/* */ if (_1 === (3)) { $s = 19; continue; }
+				/* */ if (_1 === (5)) { $s = 20; continue; }
+				/* */ $s = 21; continue;
+				/* if (_1 === (2)) { */ case 18:
+					_r$3 = z.readStartTag(); /* */ $s = 22; case 22: if($c) { $c = false; _r$3 = _r$3.$blk(); } if (_r$3 && _r$3.$blk !== undefined) { break s; }
+					z.tt = _r$3;
+					$s = -1; return z.tt;
+				/* } else if (_1 === (3)) { */ case 19:
+					_r$4 = z.readByte(); /* */ $s = 23; case 23: if($c) { $c = false; _r$4 = _r$4.$blk(); } if (_r$4 && _r$4.$blk !== undefined) { break s; }
+					c = _r$4;
+					if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+						/* break loop; */ $s = 11; continue s;
+					}
+					if (c === 62) {
+						z.tt = 5;
+						$s = -1; return z.tt;
+					}
+					/* */ if (97 <= c && c <= 122 || 65 <= c && c <= 90) { $s = 24; continue; }
+					/* */ $s = 25; continue;
+					/* if (97 <= c && c <= 122 || 65 <= c && c <= 90) { */ case 24:
+						$r = z.readTag(false); /* */ $s = 26; case 26: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+						if (!($interfaceIsEqual(z.err, $ifaceNil))) {
+							z.tt = 0;
+						} else {
+							z.tt = 3;
+						}
+						$s = -1; return z.tt;
+					/* } */ case 25:
+					z.raw.end = z.raw.end - (1) >> 0;
+					$r = z.readUntilCloseAngle(); /* */ $s = 27; case 27: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+					z.tt = 5;
+					$s = -1; return z.tt;
+				/* } else if (_1 === (5)) { */ case 20:
+					/* */ if (c === 33) { $s = 28; continue; }
+					/* */ $s = 29; continue;
+					/* if (c === 33) { */ case 28:
+						_r$5 = z.readMarkupDeclaration(); /* */ $s = 30; case 30: if($c) { $c = false; _r$5 = _r$5.$blk(); } if (_r$5 && _r$5.$blk !== undefined) { break s; }
+						z.tt = _r$5;
+						$s = -1; return z.tt;
+					/* } */ case 29:
+					z.raw.end = z.raw.end - (1) >> 0;
+					$r = z.readUntilCloseAngle(); /* */ $s = 31; case 31: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+					z.tt = 5;
+					$s = -1; return z.tt;
+				/* } */ case 21:
+			case 17:
+		/* } */ $s = 10; continue; case 11:
+		if (z.raw.start < z.raw.end) {
+			z.data.end = z.raw.end;
+			z.tt = 1;
+			$s = -1; return z.tt;
+		}
+		z.tt = 0;
+		$s = -1; return z.tt;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Tokenizer.ptr.prototype.Next }; } $f._1 = _1; $f._r = _r; $f._r$1 = _r$1; $f._r$2 = _r$2; $f._r$3 = _r$3; $f._r$4 = _r$4; $f._r$5 = _r$5; $f.c = c; $f.tokenType = tokenType; $f.x = x; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	Tokenizer.prototype.Next = function() { return this.$val.Next(); };
+	Tokenizer.ptr.prototype.Raw = function() {
+		var z;
+		z = this;
+		return $subslice(z.buf, z.raw.start, z.raw.end);
+	};
+	Tokenizer.prototype.Raw = function() { return this.$val.Raw(); };
+	convertNewlines = function(s) {
+		var _i, _ref, c, dst, i, s, src, x;
+		_ref = s;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			i = _i;
+			c = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (!((c === 13))) {
+				_i++;
+				continue;
+			}
+			src = i + 1 >> 0;
+			if (src >= s.$length || !((((src < 0 || src >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + src]) === 10))) {
+				((i < 0 || i >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + i] = 10);
+				_i++;
+				continue;
+			}
+			dst = i;
+			while (true) {
+				if (!(src < s.$length)) { break; }
+				if (((src < 0 || src >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + src]) === 13) {
+					if ((src + 1 >> 0) < s.$length && ((x = src + 1 >> 0, ((x < 0 || x >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + x])) === 10)) {
+						src = src + (1) >> 0;
+					}
+					((dst < 0 || dst >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + dst] = 10);
+				} else {
+					((dst < 0 || dst >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + dst] = ((src < 0 || src >= s.$length) ? ($throwRuntimeError("index out of range"), undefined) : s.$array[s.$offset + src]));
+				}
+				src = src + (1) >> 0;
+				dst = dst + (1) >> 0;
+			}
+			return $subslice(s, 0, dst);
+		}
+		return s;
+	};
+	Tokenizer.ptr.prototype.Text = function() {
+		var _1, s, z;
+		z = this;
+		_1 = z.tt;
+		if ((_1 === (1)) || (_1 === (5)) || (_1 === (6))) {
+			s = $subslice(z.buf, z.data.start, z.data.end);
+			z.data.start = z.raw.end;
+			z.data.end = z.raw.end;
+			s = convertNewlines(s);
+			if ((z.convertNUL || (z.tt === 5)) && bytes.Contains(s, nul)) {
+				s = bytes.Replace(s, nul, replacement, -1);
+			}
+			if (!z.textIsRaw) {
+				s = unescape(s, false);
+			}
+			return s;
+		}
+		return sliceType$3.nil;
+	};
+	Tokenizer.prototype.Text = function() { return this.$val.Text(); };
+	Tokenizer.ptr.prototype.TagName = function() {
+		var _1, _tmp, _tmp$1, _tmp$2, _tmp$3, hasAttr, name, s, z;
+		name = sliceType$3.nil;
+		hasAttr = false;
+		z = this;
+		if (z.data.start < z.data.end) {
+			_1 = z.tt;
+			if ((_1 === (2)) || (_1 === (3)) || (_1 === (4))) {
+				s = $subslice(z.buf, z.data.start, z.data.end);
+				z.data.start = z.raw.end;
+				z.data.end = z.raw.end;
+				_tmp = lower(s);
+				_tmp$1 = z.nAttrReturned < z.attr.$length;
+				name = _tmp;
+				hasAttr = _tmp$1;
+				return [name, hasAttr];
+			}
+		}
+		_tmp$2 = sliceType$3.nil;
+		_tmp$3 = false;
+		name = _tmp$2;
+		hasAttr = _tmp$3;
+		return [name, hasAttr];
+	};
+	Tokenizer.prototype.TagName = function() { return this.$val.TagName(); };
+	Tokenizer.ptr.prototype.TagAttr = function() {
+		var _1, _tmp, _tmp$1, _tmp$2, _tmp$3, _tmp$4, _tmp$5, key, moreAttr, val, x, x$1, x$2, z;
+		key = sliceType$3.nil;
+		val = sliceType$3.nil;
+		moreAttr = false;
+		z = this;
+		if (z.nAttrReturned < z.attr.$length) {
+			_1 = z.tt;
+			if ((_1 === (2)) || (_1 === (4))) {
+				x$2 = $clone((x = z.attr, x$1 = z.nAttrReturned, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1])), arrayType$3);
+				z.nAttrReturned = z.nAttrReturned + (1) >> 0;
+				key = $subslice(z.buf, x$2[0].start, x$2[0].end);
+				val = $subslice(z.buf, x$2[1].start, x$2[1].end);
+				_tmp = lower(key);
+				_tmp$1 = unescape(convertNewlines(val), true);
+				_tmp$2 = z.nAttrReturned < z.attr.$length;
+				key = _tmp;
+				val = _tmp$1;
+				moreAttr = _tmp$2;
+				return [key, val, moreAttr];
+			}
+		}
+		_tmp$3 = sliceType$3.nil;
+		_tmp$4 = sliceType$3.nil;
+		_tmp$5 = false;
+		key = _tmp$3;
+		val = _tmp$4;
+		moreAttr = _tmp$5;
+		return [key, val, moreAttr];
+	};
+	Tokenizer.prototype.TagAttr = function() { return this.$val.TagAttr(); };
+	Tokenizer.ptr.prototype.Token = function() {
+		var _1, _tmp, _tmp$1, _tmp$2, _tmp$3, _tmp$4, _tmp$5, _tuple, _tuple$1, a, key, moreAttr, name, t, val, z;
+		z = this;
+		t = new Token.ptr(z.tt, 0, "", sliceType$1.nil);
+		_1 = z.tt;
+		if ((_1 === (1)) || (_1 === (5)) || (_1 === (6))) {
+			t.Data = ($bytesToString(z.Text()));
+		} else if ((_1 === (2)) || (_1 === (4)) || (_1 === (3))) {
+			_tuple = z.TagName();
+			name = _tuple[0];
+			moreAttr = _tuple[1];
+			while (true) {
+				if (!(moreAttr)) { break; }
+				_tmp = sliceType$3.nil;
+				_tmp$1 = sliceType$3.nil;
+				key = _tmp;
+				val = _tmp$1;
+				_tuple$1 = z.TagAttr();
+				key = _tuple$1[0];
+				val = _tuple$1[1];
+				moreAttr = _tuple$1[2];
+				t.Attr = $append(t.Attr, new Attribute.ptr("", atom.String(key), ($bytesToString(val))));
+			}
+			a = atom.Lookup(name);
+			if (!((a === 0))) {
+				_tmp$2 = a;
+				_tmp$3 = new atom.Atom(a).String();
+				t.DataAtom = _tmp$2;
+				t.Data = _tmp$3;
+			} else {
+				_tmp$4 = 0;
+				_tmp$5 = ($bytesToString(name));
+				t.DataAtom = _tmp$4;
+				t.Data = _tmp$5;
+			}
+		}
+		return t;
+	};
+	Tokenizer.prototype.Token = function() { return this.$val.Token(); };
+	Tokenizer.ptr.prototype.SetMaxBuf = function(n) {
+		var n, z;
+		z = this;
+		z.maxBuf = n;
+	};
+	Tokenizer.prototype.SetMaxBuf = function(n) { return this.$val.SetMaxBuf(n); };
+	NewTokenizer = function(r) {
+		var _r, r, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; r = $f.r; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		_r = NewTokenizerFragment(r, ""); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		$s = -1; return _r;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: NewTokenizer }; } $f._r = _r; $f.r = r; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.NewTokenizer = NewTokenizer;
+	NewTokenizerFragment = function(r, contextTag) {
+		var _1, _r, contextTag, r, s, z, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _r = $f._r; contextTag = $f.contextTag; r = $f.r; s = $f.s; z = $f.z; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		z = new Tokenizer.ptr(r, 0, $ifaceNil, $ifaceNil, new span.ptr(0, 0), $makeSlice(sliceType$3, 0, 4096), 0, new span.ptr(0, 0), arrayType$3.zero(), sliceType$6.nil, 0, "", false, false, false);
+		/* */ if (!(contextTag === "")) { $s = 1; continue; }
+		/* */ $s = 2; continue;
+		/* if (!(contextTag === "")) { */ case 1:
+				_r = strings.ToLower(contextTag); /* */ $s = 4; case 4: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				s = _r;
+				_1 = s;
+				if (_1 === ("iframe") || _1 === ("noembed") || _1 === ("noframes") || _1 === ("noscript") || _1 === ("plaintext") || _1 === ("script") || _1 === ("style") || _1 === ("title") || _1 === ("textarea") || _1 === ("xmp")) {
+					z.rawTag = s;
+				}
+			case 3:
+		/* } */ case 2:
+		$s = -1; return z;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: NewTokenizerFragment }; } $f._1 = _1; $f._r = _r; $f.contextTag = contextTag; $f.r = r; $f.s = s; $f.z = z; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.NewTokenizerFragment = NewTokenizerFragment;
+	ptrType.methods = [{prop: "InsertBefore", name: "InsertBefore", pkg: "", typ: $funcType([ptrType, ptrType], [], false)}, {prop: "AppendChild", name: "AppendChild", pkg: "", typ: $funcType([ptrType], [], false)}, {prop: "RemoveChild", name: "RemoveChild", pkg: "", typ: $funcType([ptrType], [], false)}, {prop: "clone", name: "clone", pkg: "golang.org/x/net/html", typ: $funcType([], [ptrType], false)}];
+	ptrType$1.methods = [{prop: "pop", name: "pop", pkg: "golang.org/x/net/html", typ: $funcType([], [ptrType], false)}, {prop: "top", name: "top", pkg: "golang.org/x/net/html", typ: $funcType([], [ptrType], false)}, {prop: "index", name: "index", pkg: "golang.org/x/net/html", typ: $funcType([ptrType], [$Int], false)}, {prop: "contains", name: "contains", pkg: "golang.org/x/net/html", typ: $funcType([atom.Atom], [$Bool], false)}, {prop: "insert", name: "insert", pkg: "golang.org/x/net/html", typ: $funcType([$Int, ptrType], [], false)}, {prop: "remove", name: "remove", pkg: "golang.org/x/net/html", typ: $funcType([ptrType], [], false)}];
+	ptrType$2.methods = [{prop: "pop", name: "pop", pkg: "golang.org/x/net/html", typ: $funcType([], [insertionMode], false)}, {prop: "top", name: "top", pkg: "golang.org/x/net/html", typ: $funcType([], [insertionMode], false)}];
+	ptrType$4.methods = [{prop: "top", name: "top", pkg: "golang.org/x/net/html", typ: $funcType([], [ptrType], false)}, {prop: "popUntil", name: "popUntil", pkg: "golang.org/x/net/html", typ: $funcType([scope, sliceType$2], [$Bool], true)}, {prop: "indexOfElementInScope", name: "indexOfElementInScope", pkg: "golang.org/x/net/html", typ: $funcType([scope, sliceType$2], [$Int], true)}, {prop: "elementInScope", name: "elementInScope", pkg: "golang.org/x/net/html", typ: $funcType([scope, sliceType$2], [$Bool], true)}, {prop: "clearStackToContext", name: "clearStackToContext", pkg: "golang.org/x/net/html", typ: $funcType([scope], [], false)}, {prop: "generateImpliedEndTags", name: "generateImpliedEndTags", pkg: "golang.org/x/net/html", typ: $funcType([sliceType], [], true)}, {prop: "addChild", name: "addChild", pkg: "golang.org/x/net/html", typ: $funcType([ptrType], [], false)}, {prop: "shouldFosterParent", name: "shouldFosterParent", pkg: "golang.org/x/net/html", typ: $funcType([], [$Bool], false)}, {prop: "fosterParent", name: "fosterParent", pkg: "golang.org/x/net/html", typ: $funcType([ptrType], [], false)}, {prop: "addText", name: "addText", pkg: "golang.org/x/net/html", typ: $funcType([$String], [], false)}, {prop: "addElement", name: "addElement", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "addFormattingElement", name: "addFormattingElement", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "clearActiveFormattingElements", name: "clearActiveFormattingElements", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "reconstructActiveFormattingElements", name: "reconstructActiveFormattingElements", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "acknowledgeSelfClosingTag", name: "acknowledgeSelfClosingTag", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "setOriginalIM", name: "setOriginalIM", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "resetInsertionMode", name: "resetInsertionMode", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "inBodyEndTagFormatting", name: "inBodyEndTagFormatting", pkg: "golang.org/x/net/html", typ: $funcType([atom.Atom], [], false)}, {prop: "inBodyEndTagOther", name: "inBodyEndTagOther", pkg: "golang.org/x/net/html", typ: $funcType([atom.Atom], [], false)}, {prop: "inForeignContent", name: "inForeignContent", pkg: "golang.org/x/net/html", typ: $funcType([], [$Bool], false)}, {prop: "parseImpliedToken", name: "parseImpliedToken", pkg: "golang.org/x/net/html", typ: $funcType([TokenType, atom.Atom, $String], [], false)}, {prop: "parseCurrentToken", name: "parseCurrentToken", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "parse", name: "parse", pkg: "golang.org/x/net/html", typ: $funcType([], [$error], false)}];
+	TokenType.methods = [{prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}];
+	Token.methods = [{prop: "tagString", name: "tagString", pkg: "golang.org/x/net/html", typ: $funcType([], [$String], false)}, {prop: "String", name: "String", pkg: "", typ: $funcType([], [$String], false)}];
+	ptrType$3.methods = [{prop: "AllowCDATA", name: "AllowCDATA", pkg: "", typ: $funcType([$Bool], [], false)}, {prop: "NextIsNotRawText", name: "NextIsNotRawText", pkg: "", typ: $funcType([], [], false)}, {prop: "Err", name: "Err", pkg: "", typ: $funcType([], [$error], false)}, {prop: "readByte", name: "readByte", pkg: "golang.org/x/net/html", typ: $funcType([], [$Uint8], false)}, {prop: "Buffered", name: "Buffered", pkg: "", typ: $funcType([], [sliceType$3], false)}, {prop: "skipWhiteSpace", name: "skipWhiteSpace", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "readRawOrRCDATA", name: "readRawOrRCDATA", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "readRawEndTag", name: "readRawEndTag", pkg: "golang.org/x/net/html", typ: $funcType([], [$Bool], false)}, {prop: "readScript", name: "readScript", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "readComment", name: "readComment", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "readUntilCloseAngle", name: "readUntilCloseAngle", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "readMarkupDeclaration", name: "readMarkupDeclaration", pkg: "golang.org/x/net/html", typ: $funcType([], [TokenType], false)}, {prop: "readDoctype", name: "readDoctype", pkg: "golang.org/x/net/html", typ: $funcType([], [$Bool], false)}, {prop: "readCDATA", name: "readCDATA", pkg: "golang.org/x/net/html", typ: $funcType([], [$Bool], false)}, {prop: "startTagIn", name: "startTagIn", pkg: "golang.org/x/net/html", typ: $funcType([sliceType], [$Bool], true)}, {prop: "readStartTag", name: "readStartTag", pkg: "golang.org/x/net/html", typ: $funcType([], [TokenType], false)}, {prop: "readTag", name: "readTag", pkg: "golang.org/x/net/html", typ: $funcType([$Bool], [], false)}, {prop: "readTagName", name: "readTagName", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "readTagAttrKey", name: "readTagAttrKey", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "readTagAttrVal", name: "readTagAttrVal", pkg: "golang.org/x/net/html", typ: $funcType([], [], false)}, {prop: "Next", name: "Next", pkg: "", typ: $funcType([], [TokenType], false)}, {prop: "Raw", name: "Raw", pkg: "", typ: $funcType([], [sliceType$3], false)}, {prop: "Text", name: "Text", pkg: "", typ: $funcType([], [sliceType$3], false)}, {prop: "TagName", name: "TagName", pkg: "", typ: $funcType([], [sliceType$3, $Bool], false)}, {prop: "TagAttr", name: "TagAttr", pkg: "", typ: $funcType([], [sliceType$3, sliceType$3, $Bool], false)}, {prop: "Token", name: "Token", pkg: "", typ: $funcType([], [Token], false)}, {prop: "SetMaxBuf", name: "SetMaxBuf", pkg: "", typ: $funcType([$Int], [], false)}];
+	Node.init("", [{prop: "Parent", name: "Parent", anonymous: false, exported: true, typ: ptrType, tag: ""}, {prop: "FirstChild", name: "FirstChild", anonymous: false, exported: true, typ: ptrType, tag: ""}, {prop: "LastChild", name: "LastChild", anonymous: false, exported: true, typ: ptrType, tag: ""}, {prop: "PrevSibling", name: "PrevSibling", anonymous: false, exported: true, typ: ptrType, tag: ""}, {prop: "NextSibling", name: "NextSibling", anonymous: false, exported: true, typ: ptrType, tag: ""}, {prop: "Type", name: "Type", anonymous: false, exported: true, typ: NodeType, tag: ""}, {prop: "DataAtom", name: "DataAtom", anonymous: false, exported: true, typ: atom.Atom, tag: ""}, {prop: "Data", name: "Data", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "Namespace", name: "Namespace", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "Attr", name: "Attr", anonymous: false, exported: true, typ: sliceType$1, tag: ""}]);
+	nodeStack.init(ptrType);
+	insertionModeStack.init(insertionMode);
+	parser.init("golang.org/x/net/html", [{prop: "tokenizer", name: "tokenizer", anonymous: false, exported: false, typ: ptrType$3, tag: ""}, {prop: "tok", name: "tok", anonymous: false, exported: false, typ: Token, tag: ""}, {prop: "hasSelfClosingToken", name: "hasSelfClosingToken", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "doc", name: "doc", anonymous: false, exported: false, typ: ptrType, tag: ""}, {prop: "oe", name: "oe", anonymous: false, exported: false, typ: nodeStack, tag: ""}, {prop: "afe", name: "afe", anonymous: false, exported: false, typ: nodeStack, tag: ""}, {prop: "head", name: "head", anonymous: false, exported: false, typ: ptrType, tag: ""}, {prop: "form", name: "form", anonymous: false, exported: false, typ: ptrType, tag: ""}, {prop: "scripting", name: "scripting", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "framesetOK", name: "framesetOK", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "templateStack", name: "templateStack", anonymous: false, exported: false, typ: insertionModeStack, tag: ""}, {prop: "im", name: "im", anonymous: false, exported: false, typ: insertionMode, tag: ""}, {prop: "originalIM", name: "originalIM", anonymous: false, exported: false, typ: insertionMode, tag: ""}, {prop: "fosterParenting", name: "fosterParenting", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "quirks", name: "quirks", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "fragment", name: "fragment", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "context", name: "context", anonymous: false, exported: false, typ: ptrType, tag: ""}]);
+	insertionMode.init([ptrType$4], [$Bool], false);
+	Attribute.init("", [{prop: "Namespace", name: "Namespace", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "Key", name: "Key", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "Val", name: "Val", anonymous: false, exported: true, typ: $String, tag: ""}]);
+	Token.init("", [{prop: "Type", name: "Type", anonymous: false, exported: true, typ: TokenType, tag: ""}, {prop: "DataAtom", name: "DataAtom", anonymous: false, exported: true, typ: atom.Atom, tag: ""}, {prop: "Data", name: "Data", anonymous: false, exported: true, typ: $String, tag: ""}, {prop: "Attr", name: "Attr", anonymous: false, exported: true, typ: sliceType$1, tag: ""}]);
+	span.init("golang.org/x/net/html", [{prop: "start", name: "start", anonymous: false, exported: false, typ: $Int, tag: ""}, {prop: "end", name: "end", anonymous: false, exported: false, typ: $Int, tag: ""}]);
+	Tokenizer.init("golang.org/x/net/html", [{prop: "r", name: "r", anonymous: false, exported: false, typ: io.Reader, tag: ""}, {prop: "tt", name: "tt", anonymous: false, exported: false, typ: TokenType, tag: ""}, {prop: "err", name: "err", anonymous: false, exported: false, typ: $error, tag: ""}, {prop: "readErr", name: "readErr", anonymous: false, exported: false, typ: $error, tag: ""}, {prop: "raw", name: "raw", anonymous: false, exported: false, typ: span, tag: ""}, {prop: "buf", name: "buf", anonymous: false, exported: false, typ: sliceType$3, tag: ""}, {prop: "maxBuf", name: "maxBuf", anonymous: false, exported: false, typ: $Int, tag: ""}, {prop: "data", name: "data", anonymous: false, exported: false, typ: span, tag: ""}, {prop: "pendingAttr", name: "pendingAttr", anonymous: false, exported: false, typ: arrayType$3, tag: ""}, {prop: "attr", name: "attr", anonymous: false, exported: false, typ: sliceType$6, tag: ""}, {prop: "nAttrReturned", name: "nAttrReturned", anonymous: false, exported: false, typ: $Int, tag: ""}, {prop: "rawTag", name: "rawTag", anonymous: false, exported: false, typ: $String, tag: ""}, {prop: "textIsRaw", name: "textIsRaw", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "convertNUL", name: "convertNUL", anonymous: false, exported: false, typ: $Bool, tag: ""}, {prop: "allowCDATA", name: "allowCDATA", anonymous: false, exported: false, typ: $Bool, tag: ""}]);
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = bufio.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = bytes.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = errors.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = fmt.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = atom.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = io.$init(); /* */ $s = 6; case 6: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strconv.$init(); /* */ $s = 7; case 7: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strings.$init(); /* */ $s = 8; case 8: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = utf8.$init(); /* */ $s = 9; case 9: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		isSpecialElementMap = $makeMap($String.keyFor, [{ k: "address", v: true }, { k: "applet", v: true }, { k: "area", v: true }, { k: "article", v: true }, { k: "aside", v: true }, { k: "base", v: true }, { k: "basefont", v: true }, { k: "bgsound", v: true }, { k: "blockquote", v: true }, { k: "body", v: true }, { k: "br", v: true }, { k: "button", v: true }, { k: "caption", v: true }, { k: "center", v: true }, { k: "col", v: true }, { k: "colgroup", v: true }, { k: "dd", v: true }, { k: "details", v: true }, { k: "dir", v: true }, { k: "div", v: true }, { k: "dl", v: true }, { k: "dt", v: true }, { k: "embed", v: true }, { k: "fieldset", v: true }, { k: "figcaption", v: true }, { k: "figure", v: true }, { k: "footer", v: true }, { k: "form", v: true }, { k: "frame", v: true }, { k: "frameset", v: true }, { k: "h1", v: true }, { k: "h2", v: true }, { k: "h3", v: true }, { k: "h4", v: true }, { k: "h5", v: true }, { k: "h6", v: true }, { k: "head", v: true }, { k: "header", v: true }, { k: "hgroup", v: true }, { k: "hr", v: true }, { k: "html", v: true }, { k: "iframe", v: true }, { k: "img", v: true }, { k: "input", v: true }, { k: "isindex", v: true }, { k: "keygen", v: true }, { k: "li", v: true }, { k: "link", v: true }, { k: "listing", v: true }, { k: "main", v: true }, { k: "marquee", v: true }, { k: "menu", v: true }, { k: "meta", v: true }, { k: "nav", v: true }, { k: "noembed", v: true }, { k: "noframes", v: true }, { k: "noscript", v: true }, { k: "object", v: true }, { k: "ol", v: true }, { k: "p", v: true }, { k: "param", v: true }, { k: "plaintext", v: true }, { k: "pre", v: true }, { k: "script", v: true }, { k: "section", v: true }, { k: "select", v: true }, { k: "source", v: true }, { k: "style", v: true }, { k: "summary", v: true }, { k: "table", v: true }, { k: "tbody", v: true }, { k: "td", v: true }, { k: "template", v: true }, { k: "textarea", v: true }, { k: "tfoot", v: true }, { k: "th", v: true }, { k: "thead", v: true }, { k: "title", v: true }, { k: "tr", v: true }, { k: "track", v: true }, { k: "ul", v: true }, { k: "wbr", v: true }, { k: "xmp", v: true }]);
+		quirkyIDs = new sliceType(["+//silmaril//dtd html pro v0r11 19970101//", "-//advasoft ltd//dtd html 3.0 aswedit + extensions//", "-//as//dtd html 3.0 aswedit + extensions//", "-//ietf//dtd html 2.0 level 1//", "-//ietf//dtd html 2.0 level 2//", "-//ietf//dtd html 2.0 strict level 1//", "-//ietf//dtd html 2.0 strict level 2//", "-//ietf//dtd html 2.0 strict//", "-//ietf//dtd html 2.0//", "-//ietf//dtd html 2.1e//", "-//ietf//dtd html 3.0//", "-//ietf//dtd html 3.2 final//", "-//ietf//dtd html 3.2//", "-//ietf//dtd html 3//", "-//ietf//dtd html level 0//", "-//ietf//dtd html level 1//", "-//ietf//dtd html level 2//", "-//ietf//dtd html level 3//", "-//ietf//dtd html strict level 0//", "-//ietf//dtd html strict level 1//", "-//ietf//dtd html strict level 2//", "-//ietf//dtd html strict level 3//", "-//ietf//dtd html strict//", "-//ietf//dtd html//", "-//metrius//dtd metrius presentational//", "-//microsoft//dtd internet explorer 2.0 html strict//", "-//microsoft//dtd internet explorer 2.0 html//", "-//microsoft//dtd internet explorer 2.0 tables//", "-//microsoft//dtd internet explorer 3.0 html strict//", "-//microsoft//dtd internet explorer 3.0 html//", "-//microsoft//dtd internet explorer 3.0 tables//", "-//netscape comm. corp.//dtd html//", "-//netscape comm. corp.//dtd strict html//", "-//o'reilly and associates//dtd html 2.0//", "-//o'reilly and associates//dtd html extended 1.0//", "-//o'reilly and associates//dtd html extended relaxed 1.0//", "-//softquad software//dtd hotmetal pro 6.0::19990601::extensions to html 4.0//", "-//softquad//dtd hotmetal pro 4.0::19971010::extensions to html 4.0//", "-//spyglass//dtd html 2.0 extended//", "-//sq//dtd html 2.0 hotmetal + extensions//", "-//sun microsystems corp.//dtd hotjava html//", "-//sun microsystems corp.//dtd hotjava strict html//", "-//w3c//dtd html 3 1995-03-24//", "-//w3c//dtd html 3.2 draft//", "-//w3c//dtd html 3.2 final//", "-//w3c//dtd html 3.2//", "-//w3c//dtd html 3.2s draft//", "-//w3c//dtd html 4.0 frameset//", "-//w3c//dtd html 4.0 transitional//", "-//w3c//dtd html experimental 19960712//", "-//w3c//dtd html experimental 970421//", "-//w3c//dtd w3 html//", "-//w3o//dtd w3 html 3.0//", "-//webtechs//dtd mozilla html 2.0//", "-//webtechs//dtd mozilla html//"]);
+		entity = $makeMap($String.keyFor, [{ k: "AElig;", v: 198 }, { k: "AMP;", v: 38 }, { k: "Aacute;", v: 193 }, { k: "Abreve;", v: 258 }, { k: "Acirc;", v: 194 }, { k: "Acy;", v: 1040 }, { k: "Afr;", v: 120068 }, { k: "Agrave;", v: 192 }, { k: "Alpha;", v: 913 }, { k: "Amacr;", v: 256 }, { k: "And;", v: 10835 }, { k: "Aogon;", v: 260 }, { k: "Aopf;", v: 120120 }, { k: "ApplyFunction;", v: 8289 }, { k: "Aring;", v: 197 }, { k: "Ascr;", v: 119964 }, { k: "Assign;", v: 8788 }, { k: "Atilde;", v: 195 }, { k: "Auml;", v: 196 }, { k: "Backslash;", v: 8726 }, { k: "Barv;", v: 10983 }, { k: "Barwed;", v: 8966 }, { k: "Bcy;", v: 1041 }, { k: "Because;", v: 8757 }, { k: "Bernoullis;", v: 8492 }, { k: "Beta;", v: 914 }, { k: "Bfr;", v: 120069 }, { k: "Bopf;", v: 120121 }, { k: "Breve;", v: 728 }, { k: "Bscr;", v: 8492 }, { k: "Bumpeq;", v: 8782 }, { k: "CHcy;", v: 1063 }, { k: "COPY;", v: 169 }, { k: "Cacute;", v: 262 }, { k: "Cap;", v: 8914 }, { k: "CapitalDifferentialD;", v: 8517 }, { k: "Cayleys;", v: 8493 }, { k: "Ccaron;", v: 268 }, { k: "Ccedil;", v: 199 }, { k: "Ccirc;", v: 264 }, { k: "Cconint;", v: 8752 }, { k: "Cdot;", v: 266 }, { k: "Cedilla;", v: 184 }, { k: "CenterDot;", v: 183 }, { k: "Cfr;", v: 8493 }, { k: "Chi;", v: 935 }, { k: "CircleDot;", v: 8857 }, { k: "CircleMinus;", v: 8854 }, { k: "CirclePlus;", v: 8853 }, { k: "CircleTimes;", v: 8855 }, { k: "ClockwiseContourIntegral;", v: 8754 }, { k: "CloseCurlyDoubleQuote;", v: 8221 }, { k: "CloseCurlyQuote;", v: 8217 }, { k: "Colon;", v: 8759 }, { k: "Colone;", v: 10868 }, { k: "Congruent;", v: 8801 }, { k: "Conint;", v: 8751 }, { k: "ContourIntegral;", v: 8750 }, { k: "Copf;", v: 8450 }, { k: "Coproduct;", v: 8720 }, { k: "CounterClockwiseContourIntegral;", v: 8755 }, { k: "Cross;", v: 10799 }, { k: "Cscr;", v: 119966 }, { k: "Cup;", v: 8915 }, { k: "CupCap;", v: 8781 }, { k: "DD;", v: 8517 }, { k: "DDotrahd;", v: 10513 }, { k: "DJcy;", v: 1026 }, { k: "DScy;", v: 1029 }, { k: "DZcy;", v: 1039 }, { k: "Dagger;", v: 8225 }, { k: "Darr;", v: 8609 }, { k: "Dashv;", v: 10980 }, { k: "Dcaron;", v: 270 }, { k: "Dcy;", v: 1044 }, { k: "Del;", v: 8711 }, { k: "Delta;", v: 916 }, { k: "Dfr;", v: 120071 }, { k: "DiacriticalAcute;", v: 180 }, { k: "DiacriticalDot;", v: 729 }, { k: "DiacriticalDoubleAcute;", v: 733 }, { k: "DiacriticalGrave;", v: 96 }, { k: "DiacriticalTilde;", v: 732 }, { k: "Diamond;", v: 8900 }, { k: "DifferentialD;", v: 8518 }, { k: "Dopf;", v: 120123 }, { k: "Dot;", v: 168 }, { k: "DotDot;", v: 8412 }, { k: "DotEqual;", v: 8784 }, { k: "DoubleContourIntegral;", v: 8751 }, { k: "DoubleDot;", v: 168 }, { k: "DoubleDownArrow;", v: 8659 }, { k: "DoubleLeftArrow;", v: 8656 }, { k: "DoubleLeftRightArrow;", v: 8660 }, { k: "DoubleLeftTee;", v: 10980 }, { k: "DoubleLongLeftArrow;", v: 10232 }, { k: "DoubleLongLeftRightArrow;", v: 10234 }, { k: "DoubleLongRightArrow;", v: 10233 }, { k: "DoubleRightArrow;", v: 8658 }, { k: "DoubleRightTee;", v: 8872 }, { k: "DoubleUpArrow;", v: 8657 }, { k: "DoubleUpDownArrow;", v: 8661 }, { k: "DoubleVerticalBar;", v: 8741 }, { k: "DownArrow;", v: 8595 }, { k: "DownArrowBar;", v: 10515 }, { k: "DownArrowUpArrow;", v: 8693 }, { k: "DownBreve;", v: 785 }, { k: "DownLeftRightVector;", v: 10576 }, { k: "DownLeftTeeVector;", v: 10590 }, { k: "DownLeftVector;", v: 8637 }, { k: "DownLeftVectorBar;", v: 10582 }, { k: "DownRightTeeVector;", v: 10591 }, { k: "DownRightVector;", v: 8641 }, { k: "DownRightVectorBar;", v: 10583 }, { k: "DownTee;", v: 8868 }, { k: "DownTeeArrow;", v: 8615 }, { k: "Downarrow;", v: 8659 }, { k: "Dscr;", v: 119967 }, { k: "Dstrok;", v: 272 }, { k: "ENG;", v: 330 }, { k: "ETH;", v: 208 }, { k: "Eacute;", v: 201 }, { k: "Ecaron;", v: 282 }, { k: "Ecirc;", v: 202 }, { k: "Ecy;", v: 1069 }, { k: "Edot;", v: 278 }, { k: "Efr;", v: 120072 }, { k: "Egrave;", v: 200 }, { k: "Element;", v: 8712 }, { k: "Emacr;", v: 274 }, { k: "EmptySmallSquare;", v: 9723 }, { k: "EmptyVerySmallSquare;", v: 9643 }, { k: "Eogon;", v: 280 }, { k: "Eopf;", v: 120124 }, { k: "Epsilon;", v: 917 }, { k: "Equal;", v: 10869 }, { k: "EqualTilde;", v: 8770 }, { k: "Equilibrium;", v: 8652 }, { k: "Escr;", v: 8496 }, { k: "Esim;", v: 10867 }, { k: "Eta;", v: 919 }, { k: "Euml;", v: 203 }, { k: "Exists;", v: 8707 }, { k: "ExponentialE;", v: 8519 }, { k: "Fcy;", v: 1060 }, { k: "Ffr;", v: 120073 }, { k: "FilledSmallSquare;", v: 9724 }, { k: "FilledVerySmallSquare;", v: 9642 }, { k: "Fopf;", v: 120125 }, { k: "ForAll;", v: 8704 }, { k: "Fouriertrf;", v: 8497 }, { k: "Fscr;", v: 8497 }, { k: "GJcy;", v: 1027 }, { k: "GT;", v: 62 }, { k: "Gamma;", v: 915 }, { k: "Gammad;", v: 988 }, { k: "Gbreve;", v: 286 }, { k: "Gcedil;", v: 290 }, { k: "Gcirc;", v: 284 }, { k: "Gcy;", v: 1043 }, { k: "Gdot;", v: 288 }, { k: "Gfr;", v: 120074 }, { k: "Gg;", v: 8921 }, { k: "Gopf;", v: 120126 }, { k: "GreaterEqual;", v: 8805 }, { k: "GreaterEqualLess;", v: 8923 }, { k: "GreaterFullEqual;", v: 8807 }, { k: "GreaterGreater;", v: 10914 }, { k: "GreaterLess;", v: 8823 }, { k: "GreaterSlantEqual;", v: 10878 }, { k: "GreaterTilde;", v: 8819 }, { k: "Gscr;", v: 119970 }, { k: "Gt;", v: 8811 }, { k: "HARDcy;", v: 1066 }, { k: "Hacek;", v: 711 }, { k: "Hat;", v: 94 }, { k: "Hcirc;", v: 292 }, { k: "Hfr;", v: 8460 }, { k: "HilbertSpace;", v: 8459 }, { k: "Hopf;", v: 8461 }, { k: "HorizontalLine;", v: 9472 }, { k: "Hscr;", v: 8459 }, { k: "Hstrok;", v: 294 }, { k: "HumpDownHump;", v: 8782 }, { k: "HumpEqual;", v: 8783 }, { k: "IEcy;", v: 1045 }, { k: "IJlig;", v: 306 }, { k: "IOcy;", v: 1025 }, { k: "Iacute;", v: 205 }, { k: "Icirc;", v: 206 }, { k: "Icy;", v: 1048 }, { k: "Idot;", v: 304 }, { k: "Ifr;", v: 8465 }, { k: "Igrave;", v: 204 }, { k: "Im;", v: 8465 }, { k: "Imacr;", v: 298 }, { k: "ImaginaryI;", v: 8520 }, { k: "Implies;", v: 8658 }, { k: "Int;", v: 8748 }, { k: "Integral;", v: 8747 }, { k: "Intersection;", v: 8898 }, { k: "InvisibleComma;", v: 8291 }, { k: "InvisibleTimes;", v: 8290 }, { k: "Iogon;", v: 302 }, { k: "Iopf;", v: 120128 }, { k: "Iota;", v: 921 }, { k: "Iscr;", v: 8464 }, { k: "Itilde;", v: 296 }, { k: "Iukcy;", v: 1030 }, { k: "Iuml;", v: 207 }, { k: "Jcirc;", v: 308 }, { k: "Jcy;", v: 1049 }, { k: "Jfr;", v: 120077 }, { k: "Jopf;", v: 120129 }, { k: "Jscr;", v: 119973 }, { k: "Jsercy;", v: 1032 }, { k: "Jukcy;", v: 1028 }, { k: "KHcy;", v: 1061 }, { k: "KJcy;", v: 1036 }, { k: "Kappa;", v: 922 }, { k: "Kcedil;", v: 310 }, { k: "Kcy;", v: 1050 }, { k: "Kfr;", v: 120078 }, { k: "Kopf;", v: 120130 }, { k: "Kscr;", v: 119974 }, { k: "LJcy;", v: 1033 }, { k: "LT;", v: 60 }, { k: "Lacute;", v: 313 }, { k: "Lambda;", v: 923 }, { k: "Lang;", v: 10218 }, { k: "Laplacetrf;", v: 8466 }, { k: "Larr;", v: 8606 }, { k: "Lcaron;", v: 317 }, { k: "Lcedil;", v: 315 }, { k: "Lcy;", v: 1051 }, { k: "LeftAngleBracket;", v: 10216 }, { k: "LeftArrow;", v: 8592 }, { k: "LeftArrowBar;", v: 8676 }, { k: "LeftArrowRightArrow;", v: 8646 }, { k: "LeftCeiling;", v: 8968 }, { k: "LeftDoubleBracket;", v: 10214 }, { k: "LeftDownTeeVector;", v: 10593 }, { k: "LeftDownVector;", v: 8643 }, { k: "LeftDownVectorBar;", v: 10585 }, { k: "LeftFloor;", v: 8970 }, { k: "LeftRightArrow;", v: 8596 }, { k: "LeftRightVector;", v: 10574 }, { k: "LeftTee;", v: 8867 }, { k: "LeftTeeArrow;", v: 8612 }, { k: "LeftTeeVector;", v: 10586 }, { k: "LeftTriangle;", v: 8882 }, { k: "LeftTriangleBar;", v: 10703 }, { k: "LeftTriangleEqual;", v: 8884 }, { k: "LeftUpDownVector;", v: 10577 }, { k: "LeftUpTeeVector;", v: 10592 }, { k: "LeftUpVector;", v: 8639 }, { k: "LeftUpVectorBar;", v: 10584 }, { k: "LeftVector;", v: 8636 }, { k: "LeftVectorBar;", v: 10578 }, { k: "Leftarrow;", v: 8656 }, { k: "Leftrightarrow;", v: 8660 }, { k: "LessEqualGreater;", v: 8922 }, { k: "LessFullEqual;", v: 8806 }, { k: "LessGreater;", v: 8822 }, { k: "LessLess;", v: 10913 }, { k: "LessSlantEqual;", v: 10877 }, { k: "LessTilde;", v: 8818 }, { k: "Lfr;", v: 120079 }, { k: "Ll;", v: 8920 }, { k: "Lleftarrow;", v: 8666 }, { k: "Lmidot;", v: 319 }, { k: "LongLeftArrow;", v: 10229 }, { k: "LongLeftRightArrow;", v: 10231 }, { k: "LongRightArrow;", v: 10230 }, { k: "Longleftarrow;", v: 10232 }, { k: "Longleftrightarrow;", v: 10234 }, { k: "Longrightarrow;", v: 10233 }, { k: "Lopf;", v: 120131 }, { k: "LowerLeftArrow;", v: 8601 }, { k: "LowerRightArrow;", v: 8600 }, { k: "Lscr;", v: 8466 }, { k: "Lsh;", v: 8624 }, { k: "Lstrok;", v: 321 }, { k: "Lt;", v: 8810 }, { k: "Map;", v: 10501 }, { k: "Mcy;", v: 1052 }, { k: "MediumSpace;", v: 8287 }, { k: "Mellintrf;", v: 8499 }, { k: "Mfr;", v: 120080 }, { k: "MinusPlus;", v: 8723 }, { k: "Mopf;", v: 120132 }, { k: "Mscr;", v: 8499 }, { k: "Mu;", v: 924 }, { k: "NJcy;", v: 1034 }, { k: "Nacute;", v: 323 }, { k: "Ncaron;", v: 327 }, { k: "Ncedil;", v: 325 }, { k: "Ncy;", v: 1053 }, { k: "NegativeMediumSpace;", v: 8203 }, { k: "NegativeThickSpace;", v: 8203 }, { k: "NegativeThinSpace;", v: 8203 }, { k: "NegativeVeryThinSpace;", v: 8203 }, { k: "NestedGreaterGreater;", v: 8811 }, { k: "NestedLessLess;", v: 8810 }, { k: "NewLine;", v: 10 }, { k: "Nfr;", v: 120081 }, { k: "NoBreak;", v: 8288 }, { k: "NonBreakingSpace;", v: 160 }, { k: "Nopf;", v: 8469 }, { k: "Not;", v: 10988 }, { k: "NotCongruent;", v: 8802 }, { k: "NotCupCap;", v: 8813 }, { k: "NotDoubleVerticalBar;", v: 8742 }, { k: "NotElement;", v: 8713 }, { k: "NotEqual;", v: 8800 }, { k: "NotExists;", v: 8708 }, { k: "NotGreater;", v: 8815 }, { k: "NotGreaterEqual;", v: 8817 }, { k: "NotGreaterLess;", v: 8825 }, { k: "NotGreaterTilde;", v: 8821 }, { k: "NotLeftTriangle;", v: 8938 }, { k: "NotLeftTriangleEqual;", v: 8940 }, { k: "NotLess;", v: 8814 }, { k: "NotLessEqual;", v: 8816 }, { k: "NotLessGreater;", v: 8824 }, { k: "NotLessTilde;", v: 8820 }, { k: "NotPrecedes;", v: 8832 }, { k: "NotPrecedesSlantEqual;", v: 8928 }, { k: "NotReverseElement;", v: 8716 }, { k: "NotRightTriangle;", v: 8939 }, { k: "NotRightTriangleEqual;", v: 8941 }, { k: "NotSquareSubsetEqual;", v: 8930 }, { k: "NotSquareSupersetEqual;", v: 8931 }, { k: "NotSubsetEqual;", v: 8840 }, { k: "NotSucceeds;", v: 8833 }, { k: "NotSucceedsSlantEqual;", v: 8929 }, { k: "NotSupersetEqual;", v: 8841 }, { k: "NotTilde;", v: 8769 }, { k: "NotTildeEqual;", v: 8772 }, { k: "NotTildeFullEqual;", v: 8775 }, { k: "NotTildeTilde;", v: 8777 }, { k: "NotVerticalBar;", v: 8740 }, { k: "Nscr;", v: 119977 }, { k: "Ntilde;", v: 209 }, { k: "Nu;", v: 925 }, { k: "OElig;", v: 338 }, { k: "Oacute;", v: 211 }, { k: "Ocirc;", v: 212 }, { k: "Ocy;", v: 1054 }, { k: "Odblac;", v: 336 }, { k: "Ofr;", v: 120082 }, { k: "Ograve;", v: 210 }, { k: "Omacr;", v: 332 }, { k: "Omega;", v: 937 }, { k: "Omicron;", v: 927 }, { k: "Oopf;", v: 120134 }, { k: "OpenCurlyDoubleQuote;", v: 8220 }, { k: "OpenCurlyQuote;", v: 8216 }, { k: "Or;", v: 10836 }, { k: "Oscr;", v: 119978 }, { k: "Oslash;", v: 216 }, { k: "Otilde;", v: 213 }, { k: "Otimes;", v: 10807 }, { k: "Ouml;", v: 214 }, { k: "OverBar;", v: 8254 }, { k: "OverBrace;", v: 9182 }, { k: "OverBracket;", v: 9140 }, { k: "OverParenthesis;", v: 9180 }, { k: "PartialD;", v: 8706 }, { k: "Pcy;", v: 1055 }, { k: "Pfr;", v: 120083 }, { k: "Phi;", v: 934 }, { k: "Pi;", v: 928 }, { k: "PlusMinus;", v: 177 }, { k: "Poincareplane;", v: 8460 }, { k: "Popf;", v: 8473 }, { k: "Pr;", v: 10939 }, { k: "Precedes;", v: 8826 }, { k: "PrecedesEqual;", v: 10927 }, { k: "PrecedesSlantEqual;", v: 8828 }, { k: "PrecedesTilde;", v: 8830 }, { k: "Prime;", v: 8243 }, { k: "Product;", v: 8719 }, { k: "Proportion;", v: 8759 }, { k: "Proportional;", v: 8733 }, { k: "Pscr;", v: 119979 }, { k: "Psi;", v: 936 }, { k: "QUOT;", v: 34 }, { k: "Qfr;", v: 120084 }, { k: "Qopf;", v: 8474 }, { k: "Qscr;", v: 119980 }, { k: "RBarr;", v: 10512 }, { k: "REG;", v: 174 }, { k: "Racute;", v: 340 }, { k: "Rang;", v: 10219 }, { k: "Rarr;", v: 8608 }, { k: "Rarrtl;", v: 10518 }, { k: "Rcaron;", v: 344 }, { k: "Rcedil;", v: 342 }, { k: "Rcy;", v: 1056 }, { k: "Re;", v: 8476 }, { k: "ReverseElement;", v: 8715 }, { k: "ReverseEquilibrium;", v: 8651 }, { k: "ReverseUpEquilibrium;", v: 10607 }, { k: "Rfr;", v: 8476 }, { k: "Rho;", v: 929 }, { k: "RightAngleBracket;", v: 10217 }, { k: "RightArrow;", v: 8594 }, { k: "RightArrowBar;", v: 8677 }, { k: "RightArrowLeftArrow;", v: 8644 }, { k: "RightCeiling;", v: 8969 }, { k: "RightDoubleBracket;", v: 10215 }, { k: "RightDownTeeVector;", v: 10589 }, { k: "RightDownVector;", v: 8642 }, { k: "RightDownVectorBar;", v: 10581 }, { k: "RightFloor;", v: 8971 }, { k: "RightTee;", v: 8866 }, { k: "RightTeeArrow;", v: 8614 }, { k: "RightTeeVector;", v: 10587 }, { k: "RightTriangle;", v: 8883 }, { k: "RightTriangleBar;", v: 10704 }, { k: "RightTriangleEqual;", v: 8885 }, { k: "RightUpDownVector;", v: 10575 }, { k: "RightUpTeeVector;", v: 10588 }, { k: "RightUpVector;", v: 8638 }, { k: "RightUpVectorBar;", v: 10580 }, { k: "RightVector;", v: 8640 }, { k: "RightVectorBar;", v: 10579 }, { k: "Rightarrow;", v: 8658 }, { k: "Ropf;", v: 8477 }, { k: "RoundImplies;", v: 10608 }, { k: "Rrightarrow;", v: 8667 }, { k: "Rscr;", v: 8475 }, { k: "Rsh;", v: 8625 }, { k: "RuleDelayed;", v: 10740 }, { k: "SHCHcy;", v: 1065 }, { k: "SHcy;", v: 1064 }, { k: "SOFTcy;", v: 1068 }, { k: "Sacute;", v: 346 }, { k: "Sc;", v: 10940 }, { k: "Scaron;", v: 352 }, { k: "Scedil;", v: 350 }, { k: "Scirc;", v: 348 }, { k: "Scy;", v: 1057 }, { k: "Sfr;", v: 120086 }, { k: "ShortDownArrow;", v: 8595 }, { k: "ShortLeftArrow;", v: 8592 }, { k: "ShortRightArrow;", v: 8594 }, { k: "ShortUpArrow;", v: 8593 }, { k: "Sigma;", v: 931 }, { k: "SmallCircle;", v: 8728 }, { k: "Sopf;", v: 120138 }, { k: "Sqrt;", v: 8730 }, { k: "Square;", v: 9633 }, { k: "SquareIntersection;", v: 8851 }, { k: "SquareSubset;", v: 8847 }, { k: "SquareSubsetEqual;", v: 8849 }, { k: "SquareSuperset;", v: 8848 }, { k: "SquareSupersetEqual;", v: 8850 }, { k: "SquareUnion;", v: 8852 }, { k: "Sscr;", v: 119982 }, { k: "Star;", v: 8902 }, { k: "Sub;", v: 8912 }, { k: "Subset;", v: 8912 }, { k: "SubsetEqual;", v: 8838 }, { k: "Succeeds;", v: 8827 }, { k: "SucceedsEqual;", v: 10928 }, { k: "SucceedsSlantEqual;", v: 8829 }, { k: "SucceedsTilde;", v: 8831 }, { k: "SuchThat;", v: 8715 }, { k: "Sum;", v: 8721 }, { k: "Sup;", v: 8913 }, { k: "Superset;", v: 8835 }, { k: "SupersetEqual;", v: 8839 }, { k: "Supset;", v: 8913 }, { k: "THORN;", v: 222 }, { k: "TRADE;", v: 8482 }, { k: "TSHcy;", v: 1035 }, { k: "TScy;", v: 1062 }, { k: "Tab;", v: 9 }, { k: "Tau;", v: 932 }, { k: "Tcaron;", v: 356 }, { k: "Tcedil;", v: 354 }, { k: "Tcy;", v: 1058 }, { k: "Tfr;", v: 120087 }, { k: "Therefore;", v: 8756 }, { k: "Theta;", v: 920 }, { k: "ThinSpace;", v: 8201 }, { k: "Tilde;", v: 8764 }, { k: "TildeEqual;", v: 8771 }, { k: "TildeFullEqual;", v: 8773 }, { k: "TildeTilde;", v: 8776 }, { k: "Topf;", v: 120139 }, { k: "TripleDot;", v: 8411 }, { k: "Tscr;", v: 119983 }, { k: "Tstrok;", v: 358 }, { k: "Uacute;", v: 218 }, { k: "Uarr;", v: 8607 }, { k: "Uarrocir;", v: 10569 }, { k: "Ubrcy;", v: 1038 }, { k: "Ubreve;", v: 364 }, { k: "Ucirc;", v: 219 }, { k: "Ucy;", v: 1059 }, { k: "Udblac;", v: 368 }, { k: "Ufr;", v: 120088 }, { k: "Ugrave;", v: 217 }, { k: "Umacr;", v: 362 }, { k: "UnderBar;", v: 95 }, { k: "UnderBrace;", v: 9183 }, { k: "UnderBracket;", v: 9141 }, { k: "UnderParenthesis;", v: 9181 }, { k: "Union;", v: 8899 }, { k: "UnionPlus;", v: 8846 }, { k: "Uogon;", v: 370 }, { k: "Uopf;", v: 120140 }, { k: "UpArrow;", v: 8593 }, { k: "UpArrowBar;", v: 10514 }, { k: "UpArrowDownArrow;", v: 8645 }, { k: "UpDownArrow;", v: 8597 }, { k: "UpEquilibrium;", v: 10606 }, { k: "UpTee;", v: 8869 }, { k: "UpTeeArrow;", v: 8613 }, { k: "Uparrow;", v: 8657 }, { k: "Updownarrow;", v: 8661 }, { k: "UpperLeftArrow;", v: 8598 }, { k: "UpperRightArrow;", v: 8599 }, { k: "Upsi;", v: 978 }, { k: "Upsilon;", v: 933 }, { k: "Uring;", v: 366 }, { k: "Uscr;", v: 119984 }, { k: "Utilde;", v: 360 }, { k: "Uuml;", v: 220 }, { k: "VDash;", v: 8875 }, { k: "Vbar;", v: 10987 }, { k: "Vcy;", v: 1042 }, { k: "Vdash;", v: 8873 }, { k: "Vdashl;", v: 10982 }, { k: "Vee;", v: 8897 }, { k: "Verbar;", v: 8214 }, { k: "Vert;", v: 8214 }, { k: "VerticalBar;", v: 8739 }, { k: "VerticalLine;", v: 124 }, { k: "VerticalSeparator;", v: 10072 }, { k: "VerticalTilde;", v: 8768 }, { k: "VeryThinSpace;", v: 8202 }, { k: "Vfr;", v: 120089 }, { k: "Vopf;", v: 120141 }, { k: "Vscr;", v: 119985 }, { k: "Vvdash;", v: 8874 }, { k: "Wcirc;", v: 372 }, { k: "Wedge;", v: 8896 }, { k: "Wfr;", v: 120090 }, { k: "Wopf;", v: 120142 }, { k: "Wscr;", v: 119986 }, { k: "Xfr;", v: 120091 }, { k: "Xi;", v: 926 }, { k: "Xopf;", v: 120143 }, { k: "Xscr;", v: 119987 }, { k: "YAcy;", v: 1071 }, { k: "YIcy;", v: 1031 }, { k: "YUcy;", v: 1070 }, { k: "Yacute;", v: 221 }, { k: "Ycirc;", v: 374 }, { k: "Ycy;", v: 1067 }, { k: "Yfr;", v: 120092 }, { k: "Yopf;", v: 120144 }, { k: "Yscr;", v: 119988 }, { k: "Yuml;", v: 376 }, { k: "ZHcy;", v: 1046 }, { k: "Zacute;", v: 377 }, { k: "Zcaron;", v: 381 }, { k: "Zcy;", v: 1047 }, { k: "Zdot;", v: 379 }, { k: "ZeroWidthSpace;", v: 8203 }, { k: "Zeta;", v: 918 }, { k: "Zfr;", v: 8488 }, { k: "Zopf;", v: 8484 }, { k: "Zscr;", v: 119989 }, { k: "aacute;", v: 225 }, { k: "abreve;", v: 259 }, { k: "ac;", v: 8766 }, { k: "acd;", v: 8767 }, { k: "acirc;", v: 226 }, { k: "acute;", v: 180 }, { k: "acy;", v: 1072 }, { k: "aelig;", v: 230 }, { k: "af;", v: 8289 }, { k: "afr;", v: 120094 }, { k: "agrave;", v: 224 }, { k: "alefsym;", v: 8501 }, { k: "aleph;", v: 8501 }, { k: "alpha;", v: 945 }, { k: "amacr;", v: 257 }, { k: "amalg;", v: 10815 }, { k: "amp;", v: 38 }, { k: "and;", v: 8743 }, { k: "andand;", v: 10837 }, { k: "andd;", v: 10844 }, { k: "andslope;", v: 10840 }, { k: "andv;", v: 10842 }, { k: "ang;", v: 8736 }, { k: "ange;", v: 10660 }, { k: "angle;", v: 8736 }, { k: "angmsd;", v: 8737 }, { k: "angmsdaa;", v: 10664 }, { k: "angmsdab;", v: 10665 }, { k: "angmsdac;", v: 10666 }, { k: "angmsdad;", v: 10667 }, { k: "angmsdae;", v: 10668 }, { k: "angmsdaf;", v: 10669 }, { k: "angmsdag;", v: 10670 }, { k: "angmsdah;", v: 10671 }, { k: "angrt;", v: 8735 }, { k: "angrtvb;", v: 8894 }, { k: "angrtvbd;", v: 10653 }, { k: "angsph;", v: 8738 }, { k: "angst;", v: 197 }, { k: "angzarr;", v: 9084 }, { k: "aogon;", v: 261 }, { k: "aopf;", v: 120146 }, { k: "ap;", v: 8776 }, { k: "apE;", v: 10864 }, { k: "apacir;", v: 10863 }, { k: "ape;", v: 8778 }, { k: "apid;", v: 8779 }, { k: "apos;", v: 39 }, { k: "approx;", v: 8776 }, { k: "approxeq;", v: 8778 }, { k: "aring;", v: 229 }, { k: "ascr;", v: 119990 }, { k: "ast;", v: 42 }, { k: "asymp;", v: 8776 }, { k: "asympeq;", v: 8781 }, { k: "atilde;", v: 227 }, { k: "auml;", v: 228 }, { k: "awconint;", v: 8755 }, { k: "awint;", v: 10769 }, { k: "bNot;", v: 10989 }, { k: "backcong;", v: 8780 }, { k: "backepsilon;", v: 1014 }, { k: "backprime;", v: 8245 }, { k: "backsim;", v: 8765 }, { k: "backsimeq;", v: 8909 }, { k: "barvee;", v: 8893 }, { k: "barwed;", v: 8965 }, { k: "barwedge;", v: 8965 }, { k: "bbrk;", v: 9141 }, { k: "bbrktbrk;", v: 9142 }, { k: "bcong;", v: 8780 }, { k: "bcy;", v: 1073 }, { k: "bdquo;", v: 8222 }, { k: "becaus;", v: 8757 }, { k: "because;", v: 8757 }, { k: "bemptyv;", v: 10672 }, { k: "bepsi;", v: 1014 }, { k: "bernou;", v: 8492 }, { k: "beta;", v: 946 }, { k: "beth;", v: 8502 }, { k: "between;", v: 8812 }, { k: "bfr;", v: 120095 }, { k: "bigcap;", v: 8898 }, { k: "bigcirc;", v: 9711 }, { k: "bigcup;", v: 8899 }, { k: "bigodot;", v: 10752 }, { k: "bigoplus;", v: 10753 }, { k: "bigotimes;", v: 10754 }, { k: "bigsqcup;", v: 10758 }, { k: "bigstar;", v: 9733 }, { k: "bigtriangledown;", v: 9661 }, { k: "bigtriangleup;", v: 9651 }, { k: "biguplus;", v: 10756 }, { k: "bigvee;", v: 8897 }, { k: "bigwedge;", v: 8896 }, { k: "bkarow;", v: 10509 }, { k: "blacklozenge;", v: 10731 }, { k: "blacksquare;", v: 9642 }, { k: "blacktriangle;", v: 9652 }, { k: "blacktriangledown;", v: 9662 }, { k: "blacktriangleleft;", v: 9666 }, { k: "blacktriangleright;", v: 9656 }, { k: "blank;", v: 9251 }, { k: "blk12;", v: 9618 }, { k: "blk14;", v: 9617 }, { k: "blk34;", v: 9619 }, { k: "block;", v: 9608 }, { k: "bnot;", v: 8976 }, { k: "bopf;", v: 120147 }, { k: "bot;", v: 8869 }, { k: "bottom;", v: 8869 }, { k: "bowtie;", v: 8904 }, { k: "boxDL;", v: 9559 }, { k: "boxDR;", v: 9556 }, { k: "boxDl;", v: 9558 }, { k: "boxDr;", v: 9555 }, { k: "boxH;", v: 9552 }, { k: "boxHD;", v: 9574 }, { k: "boxHU;", v: 9577 }, { k: "boxHd;", v: 9572 }, { k: "boxHu;", v: 9575 }, { k: "boxUL;", v: 9565 }, { k: "boxUR;", v: 9562 }, { k: "boxUl;", v: 9564 }, { k: "boxUr;", v: 9561 }, { k: "boxV;", v: 9553 }, { k: "boxVH;", v: 9580 }, { k: "boxVL;", v: 9571 }, { k: "boxVR;", v: 9568 }, { k: "boxVh;", v: 9579 }, { k: "boxVl;", v: 9570 }, { k: "boxVr;", v: 9567 }, { k: "boxbox;", v: 10697 }, { k: "boxdL;", v: 9557 }, { k: "boxdR;", v: 9554 }, { k: "boxdl;", v: 9488 }, { k: "boxdr;", v: 9484 }, { k: "boxh;", v: 9472 }, { k: "boxhD;", v: 9573 }, { k: "boxhU;", v: 9576 }, { k: "boxhd;", v: 9516 }, { k: "boxhu;", v: 9524 }, { k: "boxminus;", v: 8863 }, { k: "boxplus;", v: 8862 }, { k: "boxtimes;", v: 8864 }, { k: "boxuL;", v: 9563 }, { k: "boxuR;", v: 9560 }, { k: "boxul;", v: 9496 }, { k: "boxur;", v: 9492 }, { k: "boxv;", v: 9474 }, { k: "boxvH;", v: 9578 }, { k: "boxvL;", v: 9569 }, { k: "boxvR;", v: 9566 }, { k: "boxvh;", v: 9532 }, { k: "boxvl;", v: 9508 }, { k: "boxvr;", v: 9500 }, { k: "bprime;", v: 8245 }, { k: "breve;", v: 728 }, { k: "brvbar;", v: 166 }, { k: "bscr;", v: 119991 }, { k: "bsemi;", v: 8271 }, { k: "bsim;", v: 8765 }, { k: "bsime;", v: 8909 }, { k: "bsol;", v: 92 }, { k: "bsolb;", v: 10693 }, { k: "bsolhsub;", v: 10184 }, { k: "bull;", v: 8226 }, { k: "bullet;", v: 8226 }, { k: "bump;", v: 8782 }, { k: "bumpE;", v: 10926 }, { k: "bumpe;", v: 8783 }, { k: "bumpeq;", v: 8783 }, { k: "cacute;", v: 263 }, { k: "cap;", v: 8745 }, { k: "capand;", v: 10820 }, { k: "capbrcup;", v: 10825 }, { k: "capcap;", v: 10827 }, { k: "capcup;", v: 10823 }, { k: "capdot;", v: 10816 }, { k: "caret;", v: 8257 }, { k: "caron;", v: 711 }, { k: "ccaps;", v: 10829 }, { k: "ccaron;", v: 269 }, { k: "ccedil;", v: 231 }, { k: "ccirc;", v: 265 }, { k: "ccups;", v: 10828 }, { k: "ccupssm;", v: 10832 }, { k: "cdot;", v: 267 }, { k: "cedil;", v: 184 }, { k: "cemptyv;", v: 10674 }, { k: "cent;", v: 162 }, { k: "centerdot;", v: 183 }, { k: "cfr;", v: 120096 }, { k: "chcy;", v: 1095 }, { k: "check;", v: 10003 }, { k: "checkmark;", v: 10003 }, { k: "chi;", v: 967 }, { k: "cir;", v: 9675 }, { k: "cirE;", v: 10691 }, { k: "circ;", v: 710 }, { k: "circeq;", v: 8791 }, { k: "circlearrowleft;", v: 8634 }, { k: "circlearrowright;", v: 8635 }, { k: "circledR;", v: 174 }, { k: "circledS;", v: 9416 }, { k: "circledast;", v: 8859 }, { k: "circledcirc;", v: 8858 }, { k: "circleddash;", v: 8861 }, { k: "cire;", v: 8791 }, { k: "cirfnint;", v: 10768 }, { k: "cirmid;", v: 10991 }, { k: "cirscir;", v: 10690 }, { k: "clubs;", v: 9827 }, { k: "clubsuit;", v: 9827 }, { k: "colon;", v: 58 }, { k: "colone;", v: 8788 }, { k: "coloneq;", v: 8788 }, { k: "comma;", v: 44 }, { k: "commat;", v: 64 }, { k: "comp;", v: 8705 }, { k: "compfn;", v: 8728 }, { k: "complement;", v: 8705 }, { k: "complexes;", v: 8450 }, { k: "cong;", v: 8773 }, { k: "congdot;", v: 10861 }, { k: "conint;", v: 8750 }, { k: "copf;", v: 120148 }, { k: "coprod;", v: 8720 }, { k: "copy;", v: 169 }, { k: "copysr;", v: 8471 }, { k: "crarr;", v: 8629 }, { k: "cross;", v: 10007 }, { k: "cscr;", v: 119992 }, { k: "csub;", v: 10959 }, { k: "csube;", v: 10961 }, { k: "csup;", v: 10960 }, { k: "csupe;", v: 10962 }, { k: "ctdot;", v: 8943 }, { k: "cudarrl;", v: 10552 }, { k: "cudarrr;", v: 10549 }, { k: "cuepr;", v: 8926 }, { k: "cuesc;", v: 8927 }, { k: "cularr;", v: 8630 }, { k: "cularrp;", v: 10557 }, { k: "cup;", v: 8746 }, { k: "cupbrcap;", v: 10824 }, { k: "cupcap;", v: 10822 }, { k: "cupcup;", v: 10826 }, { k: "cupdot;", v: 8845 }, { k: "cupor;", v: 10821 }, { k: "curarr;", v: 8631 }, { k: "curarrm;", v: 10556 }, { k: "curlyeqprec;", v: 8926 }, { k: "curlyeqsucc;", v: 8927 }, { k: "curlyvee;", v: 8910 }, { k: "curlywedge;", v: 8911 }, { k: "curren;", v: 164 }, { k: "curvearrowleft;", v: 8630 }, { k: "curvearrowright;", v: 8631 }, { k: "cuvee;", v: 8910 }, { k: "cuwed;", v: 8911 }, { k: "cwconint;", v: 8754 }, { k: "cwint;", v: 8753 }, { k: "cylcty;", v: 9005 }, { k: "dArr;", v: 8659 }, { k: "dHar;", v: 10597 }, { k: "dagger;", v: 8224 }, { k: "daleth;", v: 8504 }, { k: "darr;", v: 8595 }, { k: "dash;", v: 8208 }, { k: "dashv;", v: 8867 }, { k: "dbkarow;", v: 10511 }, { k: "dblac;", v: 733 }, { k: "dcaron;", v: 271 }, { k: "dcy;", v: 1076 }, { k: "dd;", v: 8518 }, { k: "ddagger;", v: 8225 }, { k: "ddarr;", v: 8650 }, { k: "ddotseq;", v: 10871 }, { k: "deg;", v: 176 }, { k: "delta;", v: 948 }, { k: "demptyv;", v: 10673 }, { k: "dfisht;", v: 10623 }, { k: "dfr;", v: 120097 }, { k: "dharl;", v: 8643 }, { k: "dharr;", v: 8642 }, { k: "diam;", v: 8900 }, { k: "diamond;", v: 8900 }, { k: "diamondsuit;", v: 9830 }, { k: "diams;", v: 9830 }, { k: "die;", v: 168 }, { k: "digamma;", v: 989 }, { k: "disin;", v: 8946 }, { k: "div;", v: 247 }, { k: "divide;", v: 247 }, { k: "divideontimes;", v: 8903 }, { k: "divonx;", v: 8903 }, { k: "djcy;", v: 1106 }, { k: "dlcorn;", v: 8990 }, { k: "dlcrop;", v: 8973 }, { k: "dollar;", v: 36 }, { k: "dopf;", v: 120149 }, { k: "dot;", v: 729 }, { k: "doteq;", v: 8784 }, { k: "doteqdot;", v: 8785 }, { k: "dotminus;", v: 8760 }, { k: "dotplus;", v: 8724 }, { k: "dotsquare;", v: 8865 }, { k: "doublebarwedge;", v: 8966 }, { k: "downarrow;", v: 8595 }, { k: "downdownarrows;", v: 8650 }, { k: "downharpoonleft;", v: 8643 }, { k: "downharpoonright;", v: 8642 }, { k: "drbkarow;", v: 10512 }, { k: "drcorn;", v: 8991 }, { k: "drcrop;", v: 8972 }, { k: "dscr;", v: 119993 }, { k: "dscy;", v: 1109 }, { k: "dsol;", v: 10742 }, { k: "dstrok;", v: 273 }, { k: "dtdot;", v: 8945 }, { k: "dtri;", v: 9663 }, { k: "dtrif;", v: 9662 }, { k: "duarr;", v: 8693 }, { k: "duhar;", v: 10607 }, { k: "dwangle;", v: 10662 }, { k: "dzcy;", v: 1119 }, { k: "dzigrarr;", v: 10239 }, { k: "eDDot;", v: 10871 }, { k: "eDot;", v: 8785 }, { k: "eacute;", v: 233 }, { k: "easter;", v: 10862 }, { k: "ecaron;", v: 283 }, { k: "ecir;", v: 8790 }, { k: "ecirc;", v: 234 }, { k: "ecolon;", v: 8789 }, { k: "ecy;", v: 1101 }, { k: "edot;", v: 279 }, { k: "ee;", v: 8519 }, { k: "efDot;", v: 8786 }, { k: "efr;", v: 120098 }, { k: "eg;", v: 10906 }, { k: "egrave;", v: 232 }, { k: "egs;", v: 10902 }, { k: "egsdot;", v: 10904 }, { k: "el;", v: 10905 }, { k: "elinters;", v: 9191 }, { k: "ell;", v: 8467 }, { k: "els;", v: 10901 }, { k: "elsdot;", v: 10903 }, { k: "emacr;", v: 275 }, { k: "empty;", v: 8709 }, { k: "emptyset;", v: 8709 }, { k: "emptyv;", v: 8709 }, { k: "emsp;", v: 8195 }, { k: "emsp13;", v: 8196 }, { k: "emsp14;", v: 8197 }, { k: "eng;", v: 331 }, { k: "ensp;", v: 8194 }, { k: "eogon;", v: 281 }, { k: "eopf;", v: 120150 }, { k: "epar;", v: 8917 }, { k: "eparsl;", v: 10723 }, { k: "eplus;", v: 10865 }, { k: "epsi;", v: 949 }, { k: "epsilon;", v: 949 }, { k: "epsiv;", v: 1013 }, { k: "eqcirc;", v: 8790 }, { k: "eqcolon;", v: 8789 }, { k: "eqsim;", v: 8770 }, { k: "eqslantgtr;", v: 10902 }, { k: "eqslantless;", v: 10901 }, { k: "equals;", v: 61 }, { k: "equest;", v: 8799 }, { k: "equiv;", v: 8801 }, { k: "equivDD;", v: 10872 }, { k: "eqvparsl;", v: 10725 }, { k: "erDot;", v: 8787 }, { k: "erarr;", v: 10609 }, { k: "escr;", v: 8495 }, { k: "esdot;", v: 8784 }, { k: "esim;", v: 8770 }, { k: "eta;", v: 951 }, { k: "eth;", v: 240 }, { k: "euml;", v: 235 }, { k: "euro;", v: 8364 }, { k: "excl;", v: 33 }, { k: "exist;", v: 8707 }, { k: "expectation;", v: 8496 }, { k: "exponentiale;", v: 8519 }, { k: "fallingdotseq;", v: 8786 }, { k: "fcy;", v: 1092 }, { k: "female;", v: 9792 }, { k: "ffilig;", v: 64259 }, { k: "fflig;", v: 64256 }, { k: "ffllig;", v: 64260 }, { k: "ffr;", v: 120099 }, { k: "filig;", v: 64257 }, { k: "flat;", v: 9837 }, { k: "fllig;", v: 64258 }, { k: "fltns;", v: 9649 }, { k: "fnof;", v: 402 }, { k: "fopf;", v: 120151 }, { k: "forall;", v: 8704 }, { k: "fork;", v: 8916 }, { k: "forkv;", v: 10969 }, { k: "fpartint;", v: 10765 }, { k: "frac12;", v: 189 }, { k: "frac13;", v: 8531 }, { k: "frac14;", v: 188 }, { k: "frac15;", v: 8533 }, { k: "frac16;", v: 8537 }, { k: "frac18;", v: 8539 }, { k: "frac23;", v: 8532 }, { k: "frac25;", v: 8534 }, { k: "frac34;", v: 190 }, { k: "frac35;", v: 8535 }, { k: "frac38;", v: 8540 }, { k: "frac45;", v: 8536 }, { k: "frac56;", v: 8538 }, { k: "frac58;", v: 8541 }, { k: "frac78;", v: 8542 }, { k: "frasl;", v: 8260 }, { k: "frown;", v: 8994 }, { k: "fscr;", v: 119995 }, { k: "gE;", v: 8807 }, { k: "gEl;", v: 10892 }, { k: "gacute;", v: 501 }, { k: "gamma;", v: 947 }, { k: "gammad;", v: 989 }, { k: "gap;", v: 10886 }, { k: "gbreve;", v: 287 }, { k: "gcirc;", v: 285 }, { k: "gcy;", v: 1075 }, { k: "gdot;", v: 289 }, { k: "ge;", v: 8805 }, { k: "gel;", v: 8923 }, { k: "geq;", v: 8805 }, { k: "geqq;", v: 8807 }, { k: "geqslant;", v: 10878 }, { k: "ges;", v: 10878 }, { k: "gescc;", v: 10921 }, { k: "gesdot;", v: 10880 }, { k: "gesdoto;", v: 10882 }, { k: "gesdotol;", v: 10884 }, { k: "gesles;", v: 10900 }, { k: "gfr;", v: 120100 }, { k: "gg;", v: 8811 }, { k: "ggg;", v: 8921 }, { k: "gimel;", v: 8503 }, { k: "gjcy;", v: 1107 }, { k: "gl;", v: 8823 }, { k: "glE;", v: 10898 }, { k: "gla;", v: 10917 }, { k: "glj;", v: 10916 }, { k: "gnE;", v: 8809 }, { k: "gnap;", v: 10890 }, { k: "gnapprox;", v: 10890 }, { k: "gne;", v: 10888 }, { k: "gneq;", v: 10888 }, { k: "gneqq;", v: 8809 }, { k: "gnsim;", v: 8935 }, { k: "gopf;", v: 120152 }, { k: "grave;", v: 96 }, { k: "gscr;", v: 8458 }, { k: "gsim;", v: 8819 }, { k: "gsime;", v: 10894 }, { k: "gsiml;", v: 10896 }, { k: "gt;", v: 62 }, { k: "gtcc;", v: 10919 }, { k: "gtcir;", v: 10874 }, { k: "gtdot;", v: 8919 }, { k: "gtlPar;", v: 10645 }, { k: "gtquest;", v: 10876 }, { k: "gtrapprox;", v: 10886 }, { k: "gtrarr;", v: 10616 }, { k: "gtrdot;", v: 8919 }, { k: "gtreqless;", v: 8923 }, { k: "gtreqqless;", v: 10892 }, { k: "gtrless;", v: 8823 }, { k: "gtrsim;", v: 8819 }, { k: "hArr;", v: 8660 }, { k: "hairsp;", v: 8202 }, { k: "half;", v: 189 }, { k: "hamilt;", v: 8459 }, { k: "hardcy;", v: 1098 }, { k: "harr;", v: 8596 }, { k: "harrcir;", v: 10568 }, { k: "harrw;", v: 8621 }, { k: "hbar;", v: 8463 }, { k: "hcirc;", v: 293 }, { k: "hearts;", v: 9829 }, { k: "heartsuit;", v: 9829 }, { k: "hellip;", v: 8230 }, { k: "hercon;", v: 8889 }, { k: "hfr;", v: 120101 }, { k: "hksearow;", v: 10533 }, { k: "hkswarow;", v: 10534 }, { k: "hoarr;", v: 8703 }, { k: "homtht;", v: 8763 }, { k: "hookleftarrow;", v: 8617 }, { k: "hookrightarrow;", v: 8618 }, { k: "hopf;", v: 120153 }, { k: "horbar;", v: 8213 }, { k: "hscr;", v: 119997 }, { k: "hslash;", v: 8463 }, { k: "hstrok;", v: 295 }, { k: "hybull;", v: 8259 }, { k: "hyphen;", v: 8208 }, { k: "iacute;", v: 237 }, { k: "ic;", v: 8291 }, { k: "icirc;", v: 238 }, { k: "icy;", v: 1080 }, { k: "iecy;", v: 1077 }, { k: "iexcl;", v: 161 }, { k: "iff;", v: 8660 }, { k: "ifr;", v: 120102 }, { k: "igrave;", v: 236 }, { k: "ii;", v: 8520 }, { k: "iiiint;", v: 10764 }, { k: "iiint;", v: 8749 }, { k: "iinfin;", v: 10716 }, { k: "iiota;", v: 8489 }, { k: "ijlig;", v: 307 }, { k: "imacr;", v: 299 }, { k: "image;", v: 8465 }, { k: "imagline;", v: 8464 }, { k: "imagpart;", v: 8465 }, { k: "imath;", v: 305 }, { k: "imof;", v: 8887 }, { k: "imped;", v: 437 }, { k: "in;", v: 8712 }, { k: "incare;", v: 8453 }, { k: "infin;", v: 8734 }, { k: "infintie;", v: 10717 }, { k: "inodot;", v: 305 }, { k: "int;", v: 8747 }, { k: "intcal;", v: 8890 }, { k: "integers;", v: 8484 }, { k: "intercal;", v: 8890 }, { k: "intlarhk;", v: 10775 }, { k: "intprod;", v: 10812 }, { k: "iocy;", v: 1105 }, { k: "iogon;", v: 303 }, { k: "iopf;", v: 120154 }, { k: "iota;", v: 953 }, { k: "iprod;", v: 10812 }, { k: "iquest;", v: 191 }, { k: "iscr;", v: 119998 }, { k: "isin;", v: 8712 }, { k: "isinE;", v: 8953 }, { k: "isindot;", v: 8949 }, { k: "isins;", v: 8948 }, { k: "isinsv;", v: 8947 }, { k: "isinv;", v: 8712 }, { k: "it;", v: 8290 }, { k: "itilde;", v: 297 }, { k: "iukcy;", v: 1110 }, { k: "iuml;", v: 239 }, { k: "jcirc;", v: 309 }, { k: "jcy;", v: 1081 }, { k: "jfr;", v: 120103 }, { k: "jmath;", v: 567 }, { k: "jopf;", v: 120155 }, { k: "jscr;", v: 119999 }, { k: "jsercy;", v: 1112 }, { k: "jukcy;", v: 1108 }, { k: "kappa;", v: 954 }, { k: "kappav;", v: 1008 }, { k: "kcedil;", v: 311 }, { k: "kcy;", v: 1082 }, { k: "kfr;", v: 120104 }, { k: "kgreen;", v: 312 }, { k: "khcy;", v: 1093 }, { k: "kjcy;", v: 1116 }, { k: "kopf;", v: 120156 }, { k: "kscr;", v: 120000 }, { k: "lAarr;", v: 8666 }, { k: "lArr;", v: 8656 }, { k: "lAtail;", v: 10523 }, { k: "lBarr;", v: 10510 }, { k: "lE;", v: 8806 }, { k: "lEg;", v: 10891 }, { k: "lHar;", v: 10594 }, { k: "lacute;", v: 314 }, { k: "laemptyv;", v: 10676 }, { k: "lagran;", v: 8466 }, { k: "lambda;", v: 955 }, { k: "lang;", v: 10216 }, { k: "langd;", v: 10641 }, { k: "langle;", v: 10216 }, { k: "lap;", v: 10885 }, { k: "laquo;", v: 171 }, { k: "larr;", v: 8592 }, { k: "larrb;", v: 8676 }, { k: "larrbfs;", v: 10527 }, { k: "larrfs;", v: 10525 }, { k: "larrhk;", v: 8617 }, { k: "larrlp;", v: 8619 }, { k: "larrpl;", v: 10553 }, { k: "larrsim;", v: 10611 }, { k: "larrtl;", v: 8610 }, { k: "lat;", v: 10923 }, { k: "latail;", v: 10521 }, { k: "late;", v: 10925 }, { k: "lbarr;", v: 10508 }, { k: "lbbrk;", v: 10098 }, { k: "lbrace;", v: 123 }, { k: "lbrack;", v: 91 }, { k: "lbrke;", v: 10635 }, { k: "lbrksld;", v: 10639 }, { k: "lbrkslu;", v: 10637 }, { k: "lcaron;", v: 318 }, { k: "lcedil;", v: 316 }, { k: "lceil;", v: 8968 }, { k: "lcub;", v: 123 }, { k: "lcy;", v: 1083 }, { k: "ldca;", v: 10550 }, { k: "ldquo;", v: 8220 }, { k: "ldquor;", v: 8222 }, { k: "ldrdhar;", v: 10599 }, { k: "ldrushar;", v: 10571 }, { k: "ldsh;", v: 8626 }, { k: "le;", v: 8804 }, { k: "leftarrow;", v: 8592 }, { k: "leftarrowtail;", v: 8610 }, { k: "leftharpoondown;", v: 8637 }, { k: "leftharpoonup;", v: 8636 }, { k: "leftleftarrows;", v: 8647 }, { k: "leftrightarrow;", v: 8596 }, { k: "leftrightarrows;", v: 8646 }, { k: "leftrightharpoons;", v: 8651 }, { k: "leftrightsquigarrow;", v: 8621 }, { k: "leftthreetimes;", v: 8907 }, { k: "leg;", v: 8922 }, { k: "leq;", v: 8804 }, { k: "leqq;", v: 8806 }, { k: "leqslant;", v: 10877 }, { k: "les;", v: 10877 }, { k: "lescc;", v: 10920 }, { k: "lesdot;", v: 10879 }, { k: "lesdoto;", v: 10881 }, { k: "lesdotor;", v: 10883 }, { k: "lesges;", v: 10899 }, { k: "lessapprox;", v: 10885 }, { k: "lessdot;", v: 8918 }, { k: "lesseqgtr;", v: 8922 }, { k: "lesseqqgtr;", v: 10891 }, { k: "lessgtr;", v: 8822 }, { k: "lesssim;", v: 8818 }, { k: "lfisht;", v: 10620 }, { k: "lfloor;", v: 8970 }, { k: "lfr;", v: 120105 }, { k: "lg;", v: 8822 }, { k: "lgE;", v: 10897 }, { k: "lhard;", v: 8637 }, { k: "lharu;", v: 8636 }, { k: "lharul;", v: 10602 }, { k: "lhblk;", v: 9604 }, { k: "ljcy;", v: 1113 }, { k: "ll;", v: 8810 }, { k: "llarr;", v: 8647 }, { k: "llcorner;", v: 8990 }, { k: "llhard;", v: 10603 }, { k: "lltri;", v: 9722 }, { k: "lmidot;", v: 320 }, { k: "lmoust;", v: 9136 }, { k: "lmoustache;", v: 9136 }, { k: "lnE;", v: 8808 }, { k: "lnap;", v: 10889 }, { k: "lnapprox;", v: 10889 }, { k: "lne;", v: 10887 }, { k: "lneq;", v: 10887 }, { k: "lneqq;", v: 8808 }, { k: "lnsim;", v: 8934 }, { k: "loang;", v: 10220 }, { k: "loarr;", v: 8701 }, { k: "lobrk;", v: 10214 }, { k: "longleftarrow;", v: 10229 }, { k: "longleftrightarrow;", v: 10231 }, { k: "longmapsto;", v: 10236 }, { k: "longrightarrow;", v: 10230 }, { k: "looparrowleft;", v: 8619 }, { k: "looparrowright;", v: 8620 }, { k: "lopar;", v: 10629 }, { k: "lopf;", v: 120157 }, { k: "loplus;", v: 10797 }, { k: "lotimes;", v: 10804 }, { k: "lowast;", v: 8727 }, { k: "lowbar;", v: 95 }, { k: "loz;", v: 9674 }, { k: "lozenge;", v: 9674 }, { k: "lozf;", v: 10731 }, { k: "lpar;", v: 40 }, { k: "lparlt;", v: 10643 }, { k: "lrarr;", v: 8646 }, { k: "lrcorner;", v: 8991 }, { k: "lrhar;", v: 8651 }, { k: "lrhard;", v: 10605 }, { k: "lrm;", v: 8206 }, { k: "lrtri;", v: 8895 }, { k: "lsaquo;", v: 8249 }, { k: "lscr;", v: 120001 }, { k: "lsh;", v: 8624 }, { k: "lsim;", v: 8818 }, { k: "lsime;", v: 10893 }, { k: "lsimg;", v: 10895 }, { k: "lsqb;", v: 91 }, { k: "lsquo;", v: 8216 }, { k: "lsquor;", v: 8218 }, { k: "lstrok;", v: 322 }, { k: "lt;", v: 60 }, { k: "ltcc;", v: 10918 }, { k: "ltcir;", v: 10873 }, { k: "ltdot;", v: 8918 }, { k: "lthree;", v: 8907 }, { k: "ltimes;", v: 8905 }, { k: "ltlarr;", v: 10614 }, { k: "ltquest;", v: 10875 }, { k: "ltrPar;", v: 10646 }, { k: "ltri;", v: 9667 }, { k: "ltrie;", v: 8884 }, { k: "ltrif;", v: 9666 }, { k: "lurdshar;", v: 10570 }, { k: "luruhar;", v: 10598 }, { k: "mDDot;", v: 8762 }, { k: "macr;", v: 175 }, { k: "male;", v: 9794 }, { k: "malt;", v: 10016 }, { k: "maltese;", v: 10016 }, { k: "map;", v: 8614 }, { k: "mapsto;", v: 8614 }, { k: "mapstodown;", v: 8615 }, { k: "mapstoleft;", v: 8612 }, { k: "mapstoup;", v: 8613 }, { k: "marker;", v: 9646 }, { k: "mcomma;", v: 10793 }, { k: "mcy;", v: 1084 }, { k: "mdash;", v: 8212 }, { k: "measuredangle;", v: 8737 }, { k: "mfr;", v: 120106 }, { k: "mho;", v: 8487 }, { k: "micro;", v: 181 }, { k: "mid;", v: 8739 }, { k: "midast;", v: 42 }, { k: "midcir;", v: 10992 }, { k: "middot;", v: 183 }, { k: "minus;", v: 8722 }, { k: "minusb;", v: 8863 }, { k: "minusd;", v: 8760 }, { k: "minusdu;", v: 10794 }, { k: "mlcp;", v: 10971 }, { k: "mldr;", v: 8230 }, { k: "mnplus;", v: 8723 }, { k: "models;", v: 8871 }, { k: "mopf;", v: 120158 }, { k: "mp;", v: 8723 }, { k: "mscr;", v: 120002 }, { k: "mstpos;", v: 8766 }, { k: "mu;", v: 956 }, { k: "multimap;", v: 8888 }, { k: "mumap;", v: 8888 }, { k: "nLeftarrow;", v: 8653 }, { k: "nLeftrightarrow;", v: 8654 }, { k: "nRightarrow;", v: 8655 }, { k: "nVDash;", v: 8879 }, { k: "nVdash;", v: 8878 }, { k: "nabla;", v: 8711 }, { k: "nacute;", v: 324 }, { k: "nap;", v: 8777 }, { k: "napos;", v: 329 }, { k: "napprox;", v: 8777 }, { k: "natur;", v: 9838 }, { k: "natural;", v: 9838 }, { k: "naturals;", v: 8469 }, { k: "nbsp;", v: 160 }, { k: "ncap;", v: 10819 }, { k: "ncaron;", v: 328 }, { k: "ncedil;", v: 326 }, { k: "ncong;", v: 8775 }, { k: "ncup;", v: 10818 }, { k: "ncy;", v: 1085 }, { k: "ndash;", v: 8211 }, { k: "ne;", v: 8800 }, { k: "neArr;", v: 8663 }, { k: "nearhk;", v: 10532 }, { k: "nearr;", v: 8599 }, { k: "nearrow;", v: 8599 }, { k: "nequiv;", v: 8802 }, { k: "nesear;", v: 10536 }, { k: "nexist;", v: 8708 }, { k: "nexists;", v: 8708 }, { k: "nfr;", v: 120107 }, { k: "nge;", v: 8817 }, { k: "ngeq;", v: 8817 }, { k: "ngsim;", v: 8821 }, { k: "ngt;", v: 8815 }, { k: "ngtr;", v: 8815 }, { k: "nhArr;", v: 8654 }, { k: "nharr;", v: 8622 }, { k: "nhpar;", v: 10994 }, { k: "ni;", v: 8715 }, { k: "nis;", v: 8956 }, { k: "nisd;", v: 8954 }, { k: "niv;", v: 8715 }, { k: "njcy;", v: 1114 }, { k: "nlArr;", v: 8653 }, { k: "nlarr;", v: 8602 }, { k: "nldr;", v: 8229 }, { k: "nle;", v: 8816 }, { k: "nleftarrow;", v: 8602 }, { k: "nleftrightarrow;", v: 8622 }, { k: "nleq;", v: 8816 }, { k: "nless;", v: 8814 }, { k: "nlsim;", v: 8820 }, { k: "nlt;", v: 8814 }, { k: "nltri;", v: 8938 }, { k: "nltrie;", v: 8940 }, { k: "nmid;", v: 8740 }, { k: "nopf;", v: 120159 }, { k: "not;", v: 172 }, { k: "notin;", v: 8713 }, { k: "notinva;", v: 8713 }, { k: "notinvb;", v: 8951 }, { k: "notinvc;", v: 8950 }, { k: "notni;", v: 8716 }, { k: "notniva;", v: 8716 }, { k: "notnivb;", v: 8958 }, { k: "notnivc;", v: 8957 }, { k: "npar;", v: 8742 }, { k: "nparallel;", v: 8742 }, { k: "npolint;", v: 10772 }, { k: "npr;", v: 8832 }, { k: "nprcue;", v: 8928 }, { k: "nprec;", v: 8832 }, { k: "nrArr;", v: 8655 }, { k: "nrarr;", v: 8603 }, { k: "nrightarrow;", v: 8603 }, { k: "nrtri;", v: 8939 }, { k: "nrtrie;", v: 8941 }, { k: "nsc;", v: 8833 }, { k: "nsccue;", v: 8929 }, { k: "nscr;", v: 120003 }, { k: "nshortmid;", v: 8740 }, { k: "nshortparallel;", v: 8742 }, { k: "nsim;", v: 8769 }, { k: "nsime;", v: 8772 }, { k: "nsimeq;", v: 8772 }, { k: "nsmid;", v: 8740 }, { k: "nspar;", v: 8742 }, { k: "nsqsube;", v: 8930 }, { k: "nsqsupe;", v: 8931 }, { k: "nsub;", v: 8836 }, { k: "nsube;", v: 8840 }, { k: "nsubseteq;", v: 8840 }, { k: "nsucc;", v: 8833 }, { k: "nsup;", v: 8837 }, { k: "nsupe;", v: 8841 }, { k: "nsupseteq;", v: 8841 }, { k: "ntgl;", v: 8825 }, { k: "ntilde;", v: 241 }, { k: "ntlg;", v: 8824 }, { k: "ntriangleleft;", v: 8938 }, { k: "ntrianglelefteq;", v: 8940 }, { k: "ntriangleright;", v: 8939 }, { k: "ntrianglerighteq;", v: 8941 }, { k: "nu;", v: 957 }, { k: "num;", v: 35 }, { k: "numero;", v: 8470 }, { k: "numsp;", v: 8199 }, { k: "nvDash;", v: 8877 }, { k: "nvHarr;", v: 10500 }, { k: "nvdash;", v: 8876 }, { k: "nvinfin;", v: 10718 }, { k: "nvlArr;", v: 10498 }, { k: "nvrArr;", v: 10499 }, { k: "nwArr;", v: 8662 }, { k: "nwarhk;", v: 10531 }, { k: "nwarr;", v: 8598 }, { k: "nwarrow;", v: 8598 }, { k: "nwnear;", v: 10535 }, { k: "oS;", v: 9416 }, { k: "oacute;", v: 243 }, { k: "oast;", v: 8859 }, { k: "ocir;", v: 8858 }, { k: "ocirc;", v: 244 }, { k: "ocy;", v: 1086 }, { k: "odash;", v: 8861 }, { k: "odblac;", v: 337 }, { k: "odiv;", v: 10808 }, { k: "odot;", v: 8857 }, { k: "odsold;", v: 10684 }, { k: "oelig;", v: 339 }, { k: "ofcir;", v: 10687 }, { k: "ofr;", v: 120108 }, { k: "ogon;", v: 731 }, { k: "ograve;", v: 242 }, { k: "ogt;", v: 10689 }, { k: "ohbar;", v: 10677 }, { k: "ohm;", v: 937 }, { k: "oint;", v: 8750 }, { k: "olarr;", v: 8634 }, { k: "olcir;", v: 10686 }, { k: "olcross;", v: 10683 }, { k: "oline;", v: 8254 }, { k: "olt;", v: 10688 }, { k: "omacr;", v: 333 }, { k: "omega;", v: 969 }, { k: "omicron;", v: 959 }, { k: "omid;", v: 10678 }, { k: "ominus;", v: 8854 }, { k: "oopf;", v: 120160 }, { k: "opar;", v: 10679 }, { k: "operp;", v: 10681 }, { k: "oplus;", v: 8853 }, { k: "or;", v: 8744 }, { k: "orarr;", v: 8635 }, { k: "ord;", v: 10845 }, { k: "order;", v: 8500 }, { k: "orderof;", v: 8500 }, { k: "ordf;", v: 170 }, { k: "ordm;", v: 186 }, { k: "origof;", v: 8886 }, { k: "oror;", v: 10838 }, { k: "orslope;", v: 10839 }, { k: "orv;", v: 10843 }, { k: "oscr;", v: 8500 }, { k: "oslash;", v: 248 }, { k: "osol;", v: 8856 }, { k: "otilde;", v: 245 }, { k: "otimes;", v: 8855 }, { k: "otimesas;", v: 10806 }, { k: "ouml;", v: 246 }, { k: "ovbar;", v: 9021 }, { k: "par;", v: 8741 }, { k: "para;", v: 182 }, { k: "parallel;", v: 8741 }, { k: "parsim;", v: 10995 }, { k: "parsl;", v: 11005 }, { k: "part;", v: 8706 }, { k: "pcy;", v: 1087 }, { k: "percnt;", v: 37 }, { k: "period;", v: 46 }, { k: "permil;", v: 8240 }, { k: "perp;", v: 8869 }, { k: "pertenk;", v: 8241 }, { k: "pfr;", v: 120109 }, { k: "phi;", v: 966 }, { k: "phiv;", v: 981 }, { k: "phmmat;", v: 8499 }, { k: "phone;", v: 9742 }, { k: "pi;", v: 960 }, { k: "pitchfork;", v: 8916 }, { k: "piv;", v: 982 }, { k: "planck;", v: 8463 }, { k: "planckh;", v: 8462 }, { k: "plankv;", v: 8463 }, { k: "plus;", v: 43 }, { k: "plusacir;", v: 10787 }, { k: "plusb;", v: 8862 }, { k: "pluscir;", v: 10786 }, { k: "plusdo;", v: 8724 }, { k: "plusdu;", v: 10789 }, { k: "pluse;", v: 10866 }, { k: "plusmn;", v: 177 }, { k: "plussim;", v: 10790 }, { k: "plustwo;", v: 10791 }, { k: "pm;", v: 177 }, { k: "pointint;", v: 10773 }, { k: "popf;", v: 120161 }, { k: "pound;", v: 163 }, { k: "pr;", v: 8826 }, { k: "prE;", v: 10931 }, { k: "prap;", v: 10935 }, { k: "prcue;", v: 8828 }, { k: "pre;", v: 10927 }, { k: "prec;", v: 8826 }, { k: "precapprox;", v: 10935 }, { k: "preccurlyeq;", v: 8828 }, { k: "preceq;", v: 10927 }, { k: "precnapprox;", v: 10937 }, { k: "precneqq;", v: 10933 }, { k: "precnsim;", v: 8936 }, { k: "precsim;", v: 8830 }, { k: "prime;", v: 8242 }, { k: "primes;", v: 8473 }, { k: "prnE;", v: 10933 }, { k: "prnap;", v: 10937 }, { k: "prnsim;", v: 8936 }, { k: "prod;", v: 8719 }, { k: "profalar;", v: 9006 }, { k: "profline;", v: 8978 }, { k: "profsurf;", v: 8979 }, { k: "prop;", v: 8733 }, { k: "propto;", v: 8733 }, { k: "prsim;", v: 8830 }, { k: "prurel;", v: 8880 }, { k: "pscr;", v: 120005 }, { k: "psi;", v: 968 }, { k: "puncsp;", v: 8200 }, { k: "qfr;", v: 120110 }, { k: "qint;", v: 10764 }, { k: "qopf;", v: 120162 }, { k: "qprime;", v: 8279 }, { k: "qscr;", v: 120006 }, { k: "quaternions;", v: 8461 }, { k: "quatint;", v: 10774 }, { k: "quest;", v: 63 }, { k: "questeq;", v: 8799 }, { k: "quot;", v: 34 }, { k: "rAarr;", v: 8667 }, { k: "rArr;", v: 8658 }, { k: "rAtail;", v: 10524 }, { k: "rBarr;", v: 10511 }, { k: "rHar;", v: 10596 }, { k: "racute;", v: 341 }, { k: "radic;", v: 8730 }, { k: "raemptyv;", v: 10675 }, { k: "rang;", v: 10217 }, { k: "rangd;", v: 10642 }, { k: "range;", v: 10661 }, { k: "rangle;", v: 10217 }, { k: "raquo;", v: 187 }, { k: "rarr;", v: 8594 }, { k: "rarrap;", v: 10613 }, { k: "rarrb;", v: 8677 }, { k: "rarrbfs;", v: 10528 }, { k: "rarrc;", v: 10547 }, { k: "rarrfs;", v: 10526 }, { k: "rarrhk;", v: 8618 }, { k: "rarrlp;", v: 8620 }, { k: "rarrpl;", v: 10565 }, { k: "rarrsim;", v: 10612 }, { k: "rarrtl;", v: 8611 }, { k: "rarrw;", v: 8605 }, { k: "ratail;", v: 10522 }, { k: "ratio;", v: 8758 }, { k: "rationals;", v: 8474 }, { k: "rbarr;", v: 10509 }, { k: "rbbrk;", v: 10099 }, { k: "rbrace;", v: 125 }, { k: "rbrack;", v: 93 }, { k: "rbrke;", v: 10636 }, { k: "rbrksld;", v: 10638 }, { k: "rbrkslu;", v: 10640 }, { k: "rcaron;", v: 345 }, { k: "rcedil;", v: 343 }, { k: "rceil;", v: 8969 }, { k: "rcub;", v: 125 }, { k: "rcy;", v: 1088 }, { k: "rdca;", v: 10551 }, { k: "rdldhar;", v: 10601 }, { k: "rdquo;", v: 8221 }, { k: "rdquor;", v: 8221 }, { k: "rdsh;", v: 8627 }, { k: "real;", v: 8476 }, { k: "realine;", v: 8475 }, { k: "realpart;", v: 8476 }, { k: "reals;", v: 8477 }, { k: "rect;", v: 9645 }, { k: "reg;", v: 174 }, { k: "rfisht;", v: 10621 }, { k: "rfloor;", v: 8971 }, { k: "rfr;", v: 120111 }, { k: "rhard;", v: 8641 }, { k: "rharu;", v: 8640 }, { k: "rharul;", v: 10604 }, { k: "rho;", v: 961 }, { k: "rhov;", v: 1009 }, { k: "rightarrow;", v: 8594 }, { k: "rightarrowtail;", v: 8611 }, { k: "rightharpoondown;", v: 8641 }, { k: "rightharpoonup;", v: 8640 }, { k: "rightleftarrows;", v: 8644 }, { k: "rightleftharpoons;", v: 8652 }, { k: "rightrightarrows;", v: 8649 }, { k: "rightsquigarrow;", v: 8605 }, { k: "rightthreetimes;", v: 8908 }, { k: "ring;", v: 730 }, { k: "risingdotseq;", v: 8787 }, { k: "rlarr;", v: 8644 }, { k: "rlhar;", v: 8652 }, { k: "rlm;", v: 8207 }, { k: "rmoust;", v: 9137 }, { k: "rmoustache;", v: 9137 }, { k: "rnmid;", v: 10990 }, { k: "roang;", v: 10221 }, { k: "roarr;", v: 8702 }, { k: "robrk;", v: 10215 }, { k: "ropar;", v: 10630 }, { k: "ropf;", v: 120163 }, { k: "roplus;", v: 10798 }, { k: "rotimes;", v: 10805 }, { k: "rpar;", v: 41 }, { k: "rpargt;", v: 10644 }, { k: "rppolint;", v: 10770 }, { k: "rrarr;", v: 8649 }, { k: "rsaquo;", v: 8250 }, { k: "rscr;", v: 120007 }, { k: "rsh;", v: 8625 }, { k: "rsqb;", v: 93 }, { k: "rsquo;", v: 8217 }, { k: "rsquor;", v: 8217 }, { k: "rthree;", v: 8908 }, { k: "rtimes;", v: 8906 }, { k: "rtri;", v: 9657 }, { k: "rtrie;", v: 8885 }, { k: "rtrif;", v: 9656 }, { k: "rtriltri;", v: 10702 }, { k: "ruluhar;", v: 10600 }, { k: "rx;", v: 8478 }, { k: "sacute;", v: 347 }, { k: "sbquo;", v: 8218 }, { k: "sc;", v: 8827 }, { k: "scE;", v: 10932 }, { k: "scap;", v: 10936 }, { k: "scaron;", v: 353 }, { k: "sccue;", v: 8829 }, { k: "sce;", v: 10928 }, { k: "scedil;", v: 351 }, { k: "scirc;", v: 349 }, { k: "scnE;", v: 10934 }, { k: "scnap;", v: 10938 }, { k: "scnsim;", v: 8937 }, { k: "scpolint;", v: 10771 }, { k: "scsim;", v: 8831 }, { k: "scy;", v: 1089 }, { k: "sdot;", v: 8901 }, { k: "sdotb;", v: 8865 }, { k: "sdote;", v: 10854 }, { k: "seArr;", v: 8664 }, { k: "searhk;", v: 10533 }, { k: "searr;", v: 8600 }, { k: "searrow;", v: 8600 }, { k: "sect;", v: 167 }, { k: "semi;", v: 59 }, { k: "seswar;", v: 10537 }, { k: "setminus;", v: 8726 }, { k: "setmn;", v: 8726 }, { k: "sext;", v: 10038 }, { k: "sfr;", v: 120112 }, { k: "sfrown;", v: 8994 }, { k: "sharp;", v: 9839 }, { k: "shchcy;", v: 1097 }, { k: "shcy;", v: 1096 }, { k: "shortmid;", v: 8739 }, { k: "shortparallel;", v: 8741 }, { k: "shy;", v: 173 }, { k: "sigma;", v: 963 }, { k: "sigmaf;", v: 962 }, { k: "sigmav;", v: 962 }, { k: "sim;", v: 8764 }, { k: "simdot;", v: 10858 }, { k: "sime;", v: 8771 }, { k: "simeq;", v: 8771 }, { k: "simg;", v: 10910 }, { k: "simgE;", v: 10912 }, { k: "siml;", v: 10909 }, { k: "simlE;", v: 10911 }, { k: "simne;", v: 8774 }, { k: "simplus;", v: 10788 }, { k: "simrarr;", v: 10610 }, { k: "slarr;", v: 8592 }, { k: "smallsetminus;", v: 8726 }, { k: "smashp;", v: 10803 }, { k: "smeparsl;", v: 10724 }, { k: "smid;", v: 8739 }, { k: "smile;", v: 8995 }, { k: "smt;", v: 10922 }, { k: "smte;", v: 10924 }, { k: "softcy;", v: 1100 }, { k: "sol;", v: 47 }, { k: "solb;", v: 10692 }, { k: "solbar;", v: 9023 }, { k: "sopf;", v: 120164 }, { k: "spades;", v: 9824 }, { k: "spadesuit;", v: 9824 }, { k: "spar;", v: 8741 }, { k: "sqcap;", v: 8851 }, { k: "sqcup;", v: 8852 }, { k: "sqsub;", v: 8847 }, { k: "sqsube;", v: 8849 }, { k: "sqsubset;", v: 8847 }, { k: "sqsubseteq;", v: 8849 }, { k: "sqsup;", v: 8848 }, { k: "sqsupe;", v: 8850 }, { k: "sqsupset;", v: 8848 }, { k: "sqsupseteq;", v: 8850 }, { k: "squ;", v: 9633 }, { k: "square;", v: 9633 }, { k: "squarf;", v: 9642 }, { k: "squf;", v: 9642 }, { k: "srarr;", v: 8594 }, { k: "sscr;", v: 120008 }, { k: "ssetmn;", v: 8726 }, { k: "ssmile;", v: 8995 }, { k: "sstarf;", v: 8902 }, { k: "star;", v: 9734 }, { k: "starf;", v: 9733 }, { k: "straightepsilon;", v: 1013 }, { k: "straightphi;", v: 981 }, { k: "strns;", v: 175 }, { k: "sub;", v: 8834 }, { k: "subE;", v: 10949 }, { k: "subdot;", v: 10941 }, { k: "sube;", v: 8838 }, { k: "subedot;", v: 10947 }, { k: "submult;", v: 10945 }, { k: "subnE;", v: 10955 }, { k: "subne;", v: 8842 }, { k: "subplus;", v: 10943 }, { k: "subrarr;", v: 10617 }, { k: "subset;", v: 8834 }, { k: "subseteq;", v: 8838 }, { k: "subseteqq;", v: 10949 }, { k: "subsetneq;", v: 8842 }, { k: "subsetneqq;", v: 10955 }, { k: "subsim;", v: 10951 }, { k: "subsub;", v: 10965 }, { k: "subsup;", v: 10963 }, { k: "succ;", v: 8827 }, { k: "succapprox;", v: 10936 }, { k: "succcurlyeq;", v: 8829 }, { k: "succeq;", v: 10928 }, { k: "succnapprox;", v: 10938 }, { k: "succneqq;", v: 10934 }, { k: "succnsim;", v: 8937 }, { k: "succsim;", v: 8831 }, { k: "sum;", v: 8721 }, { k: "sung;", v: 9834 }, { k: "sup;", v: 8835 }, { k: "sup1;", v: 185 }, { k: "sup2;", v: 178 }, { k: "sup3;", v: 179 }, { k: "supE;", v: 10950 }, { k: "supdot;", v: 10942 }, { k: "supdsub;", v: 10968 }, { k: "supe;", v: 8839 }, { k: "supedot;", v: 10948 }, { k: "suphsol;", v: 10185 }, { k: "suphsub;", v: 10967 }, { k: "suplarr;", v: 10619 }, { k: "supmult;", v: 10946 }, { k: "supnE;", v: 10956 }, { k: "supne;", v: 8843 }, { k: "supplus;", v: 10944 }, { k: "supset;", v: 8835 }, { k: "supseteq;", v: 8839 }, { k: "supseteqq;", v: 10950 }, { k: "supsetneq;", v: 8843 }, { k: "supsetneqq;", v: 10956 }, { k: "supsim;", v: 10952 }, { k: "supsub;", v: 10964 }, { k: "supsup;", v: 10966 }, { k: "swArr;", v: 8665 }, { k: "swarhk;", v: 10534 }, { k: "swarr;", v: 8601 }, { k: "swarrow;", v: 8601 }, { k: "swnwar;", v: 10538 }, { k: "szlig;", v: 223 }, { k: "target;", v: 8982 }, { k: "tau;", v: 964 }, { k: "tbrk;", v: 9140 }, { k: "tcaron;", v: 357 }, { k: "tcedil;", v: 355 }, { k: "tcy;", v: 1090 }, { k: "tdot;", v: 8411 }, { k: "telrec;", v: 8981 }, { k: "tfr;", v: 120113 }, { k: "there4;", v: 8756 }, { k: "therefore;", v: 8756 }, { k: "theta;", v: 952 }, { k: "thetasym;", v: 977 }, { k: "thetav;", v: 977 }, { k: "thickapprox;", v: 8776 }, { k: "thicksim;", v: 8764 }, { k: "thinsp;", v: 8201 }, { k: "thkap;", v: 8776 }, { k: "thksim;", v: 8764 }, { k: "thorn;", v: 254 }, { k: "tilde;", v: 732 }, { k: "times;", v: 215 }, { k: "timesb;", v: 8864 }, { k: "timesbar;", v: 10801 }, { k: "timesd;", v: 10800 }, { k: "tint;", v: 8749 }, { k: "toea;", v: 10536 }, { k: "top;", v: 8868 }, { k: "topbot;", v: 9014 }, { k: "topcir;", v: 10993 }, { k: "topf;", v: 120165 }, { k: "topfork;", v: 10970 }, { k: "tosa;", v: 10537 }, { k: "tprime;", v: 8244 }, { k: "trade;", v: 8482 }, { k: "triangle;", v: 9653 }, { k: "triangledown;", v: 9663 }, { k: "triangleleft;", v: 9667 }, { k: "trianglelefteq;", v: 8884 }, { k: "triangleq;", v: 8796 }, { k: "triangleright;", v: 9657 }, { k: "trianglerighteq;", v: 8885 }, { k: "tridot;", v: 9708 }, { k: "trie;", v: 8796 }, { k: "triminus;", v: 10810 }, { k: "triplus;", v: 10809 }, { k: "trisb;", v: 10701 }, { k: "tritime;", v: 10811 }, { k: "trpezium;", v: 9186 }, { k: "tscr;", v: 120009 }, { k: "tscy;", v: 1094 }, { k: "tshcy;", v: 1115 }, { k: "tstrok;", v: 359 }, { k: "twixt;", v: 8812 }, { k: "twoheadleftarrow;", v: 8606 }, { k: "twoheadrightarrow;", v: 8608 }, { k: "uArr;", v: 8657 }, { k: "uHar;", v: 10595 }, { k: "uacute;", v: 250 }, { k: "uarr;", v: 8593 }, { k: "ubrcy;", v: 1118 }, { k: "ubreve;", v: 365 }, { k: "ucirc;", v: 251 }, { k: "ucy;", v: 1091 }, { k: "udarr;", v: 8645 }, { k: "udblac;", v: 369 }, { k: "udhar;", v: 10606 }, { k: "ufisht;", v: 10622 }, { k: "ufr;", v: 120114 }, { k: "ugrave;", v: 249 }, { k: "uharl;", v: 8639 }, { k: "uharr;", v: 8638 }, { k: "uhblk;", v: 9600 }, { k: "ulcorn;", v: 8988 }, { k: "ulcorner;", v: 8988 }, { k: "ulcrop;", v: 8975 }, { k: "ultri;", v: 9720 }, { k: "umacr;", v: 363 }, { k: "uml;", v: 168 }, { k: "uogon;", v: 371 }, { k: "uopf;", v: 120166 }, { k: "uparrow;", v: 8593 }, { k: "updownarrow;", v: 8597 }, { k: "upharpoonleft;", v: 8639 }, { k: "upharpoonright;", v: 8638 }, { k: "uplus;", v: 8846 }, { k: "upsi;", v: 965 }, { k: "upsih;", v: 978 }, { k: "upsilon;", v: 965 }, { k: "upuparrows;", v: 8648 }, { k: "urcorn;", v: 8989 }, { k: "urcorner;", v: 8989 }, { k: "urcrop;", v: 8974 }, { k: "uring;", v: 367 }, { k: "urtri;", v: 9721 }, { k: "uscr;", v: 120010 }, { k: "utdot;", v: 8944 }, { k: "utilde;", v: 361 }, { k: "utri;", v: 9653 }, { k: "utrif;", v: 9652 }, { k: "uuarr;", v: 8648 }, { k: "uuml;", v: 252 }, { k: "uwangle;", v: 10663 }, { k: "vArr;", v: 8661 }, { k: "vBar;", v: 10984 }, { k: "vBarv;", v: 10985 }, { k: "vDash;", v: 8872 }, { k: "vangrt;", v: 10652 }, { k: "varepsilon;", v: 1013 }, { k: "varkappa;", v: 1008 }, { k: "varnothing;", v: 8709 }, { k: "varphi;", v: 981 }, { k: "varpi;", v: 982 }, { k: "varpropto;", v: 8733 }, { k: "varr;", v: 8597 }, { k: "varrho;", v: 1009 }, { k: "varsigma;", v: 962 }, { k: "vartheta;", v: 977 }, { k: "vartriangleleft;", v: 8882 }, { k: "vartriangleright;", v: 8883 }, { k: "vcy;", v: 1074 }, { k: "vdash;", v: 8866 }, { k: "vee;", v: 8744 }, { k: "veebar;", v: 8891 }, { k: "veeeq;", v: 8794 }, { k: "vellip;", v: 8942 }, { k: "verbar;", v: 124 }, { k: "vert;", v: 124 }, { k: "vfr;", v: 120115 }, { k: "vltri;", v: 8882 }, { k: "vopf;", v: 120167 }, { k: "vprop;", v: 8733 }, { k: "vrtri;", v: 8883 }, { k: "vscr;", v: 120011 }, { k: "vzigzag;", v: 10650 }, { k: "wcirc;", v: 373 }, { k: "wedbar;", v: 10847 }, { k: "wedge;", v: 8743 }, { k: "wedgeq;", v: 8793 }, { k: "weierp;", v: 8472 }, { k: "wfr;", v: 120116 }, { k: "wopf;", v: 120168 }, { k: "wp;", v: 8472 }, { k: "wr;", v: 8768 }, { k: "wreath;", v: 8768 }, { k: "wscr;", v: 120012 }, { k: "xcap;", v: 8898 }, { k: "xcirc;", v: 9711 }, { k: "xcup;", v: 8899 }, { k: "xdtri;", v: 9661 }, { k: "xfr;", v: 120117 }, { k: "xhArr;", v: 10234 }, { k: "xharr;", v: 10231 }, { k: "xi;", v: 958 }, { k: "xlArr;", v: 10232 }, { k: "xlarr;", v: 10229 }, { k: "xmap;", v: 10236 }, { k: "xnis;", v: 8955 }, { k: "xodot;", v: 10752 }, { k: "xopf;", v: 120169 }, { k: "xoplus;", v: 10753 }, { k: "xotime;", v: 10754 }, { k: "xrArr;", v: 10233 }, { k: "xrarr;", v: 10230 }, { k: "xscr;", v: 120013 }, { k: "xsqcup;", v: 10758 }, { k: "xuplus;", v: 10756 }, { k: "xutri;", v: 9651 }, { k: "xvee;", v: 8897 }, { k: "xwedge;", v: 8896 }, { k: "yacute;", v: 253 }, { k: "yacy;", v: 1103 }, { k: "ycirc;", v: 375 }, { k: "ycy;", v: 1099 }, { k: "yen;", v: 165 }, { k: "yfr;", v: 120118 }, { k: "yicy;", v: 1111 }, { k: "yopf;", v: 120170 }, { k: "yscr;", v: 120014 }, { k: "yucy;", v: 1102 }, { k: "yuml;", v: 255 }, { k: "zacute;", v: 378 }, { k: "zcaron;", v: 382 }, { k: "zcy;", v: 1079 }, { k: "zdot;", v: 380 }, { k: "zeetrf;", v: 8488 }, { k: "zeta;", v: 950 }, { k: "zfr;", v: 120119 }, { k: "zhcy;", v: 1078 }, { k: "zigrarr;", v: 8669 }, { k: "zopf;", v: 120171 }, { k: "zscr;", v: 120015 }, { k: "zwj;", v: 8205 }, { k: "zwnj;", v: 8204 }, { k: "AElig", v: 198 }, { k: "AMP", v: 38 }, { k: "Aacute", v: 193 }, { k: "Acirc", v: 194 }, { k: "Agrave", v: 192 }, { k: "Aring", v: 197 }, { k: "Atilde", v: 195 }, { k: "Auml", v: 196 }, { k: "COPY", v: 169 }, { k: "Ccedil", v: 199 }, { k: "ETH", v: 208 }, { k: "Eacute", v: 201 }, { k: "Ecirc", v: 202 }, { k: "Egrave", v: 200 }, { k: "Euml", v: 203 }, { k: "GT", v: 62 }, { k: "Iacute", v: 205 }, { k: "Icirc", v: 206 }, { k: "Igrave", v: 204 }, { k: "Iuml", v: 207 }, { k: "LT", v: 60 }, { k: "Ntilde", v: 209 }, { k: "Oacute", v: 211 }, { k: "Ocirc", v: 212 }, { k: "Ograve", v: 210 }, { k: "Oslash", v: 216 }, { k: "Otilde", v: 213 }, { k: "Ouml", v: 214 }, { k: "QUOT", v: 34 }, { k: "REG", v: 174 }, { k: "THORN", v: 222 }, { k: "Uacute", v: 218 }, { k: "Ucirc", v: 219 }, { k: "Ugrave", v: 217 }, { k: "Uuml", v: 220 }, { k: "Yacute", v: 221 }, { k: "aacute", v: 225 }, { k: "acirc", v: 226 }, { k: "acute", v: 180 }, { k: "aelig", v: 230 }, { k: "agrave", v: 224 }, { k: "amp", v: 38 }, { k: "aring", v: 229 }, { k: "atilde", v: 227 }, { k: "auml", v: 228 }, { k: "brvbar", v: 166 }, { k: "ccedil", v: 231 }, { k: "cedil", v: 184 }, { k: "cent", v: 162 }, { k: "copy", v: 169 }, { k: "curren", v: 164 }, { k: "deg", v: 176 }, { k: "divide", v: 247 }, { k: "eacute", v: 233 }, { k: "ecirc", v: 234 }, { k: "egrave", v: 232 }, { k: "eth", v: 240 }, { k: "euml", v: 235 }, { k: "frac12", v: 189 }, { k: "frac14", v: 188 }, { k: "frac34", v: 190 }, { k: "gt", v: 62 }, { k: "iacute", v: 237 }, { k: "icirc", v: 238 }, { k: "iexcl", v: 161 }, { k: "igrave", v: 236 }, { k: "iquest", v: 191 }, { k: "iuml", v: 239 }, { k: "laquo", v: 171 }, { k: "lt", v: 60 }, { k: "macr", v: 175 }, { k: "micro", v: 181 }, { k: "middot", v: 183 }, { k: "nbsp", v: 160 }, { k: "not", v: 172 }, { k: "ntilde", v: 241 }, { k: "oacute", v: 243 }, { k: "ocirc", v: 244 }, { k: "ograve", v: 242 }, { k: "ordf", v: 170 }, { k: "ordm", v: 186 }, { k: "oslash", v: 248 }, { k: "otilde", v: 245 }, { k: "ouml", v: 246 }, { k: "para", v: 182 }, { k: "plusmn", v: 177 }, { k: "pound", v: 163 }, { k: "quot", v: 34 }, { k: "raquo", v: 187 }, { k: "reg", v: 174 }, { k: "sect", v: 167 }, { k: "shy", v: 173 }, { k: "sup1", v: 185 }, { k: "sup2", v: 178 }, { k: "sup3", v: 179 }, { k: "szlig", v: 223 }, { k: "thorn", v: 254 }, { k: "times", v: 215 }, { k: "uacute", v: 250 }, { k: "ucirc", v: 251 }, { k: "ugrave", v: 249 }, { k: "uml", v: 168 }, { k: "uuml", v: 252 }, { k: "yacute", v: 253 }, { k: "yen", v: 165 }, { k: "yuml", v: 255 }]);
+		entity2 = $makeMap($String.keyFor, [{ k: "NotEqualTilde;", v: $toNativeArray($kindInt32, [8770, 824]) }, { k: "NotGreaterFullEqual;", v: $toNativeArray($kindInt32, [8807, 824]) }, { k: "NotGreaterGreater;", v: $toNativeArray($kindInt32, [8811, 824]) }, { k: "NotGreaterSlantEqual;", v: $toNativeArray($kindInt32, [10878, 824]) }, { k: "NotHumpDownHump;", v: $toNativeArray($kindInt32, [8782, 824]) }, { k: "NotHumpEqual;", v: $toNativeArray($kindInt32, [8783, 824]) }, { k: "NotLeftTriangleBar;", v: $toNativeArray($kindInt32, [10703, 824]) }, { k: "NotLessLess;", v: $toNativeArray($kindInt32, [8810, 824]) }, { k: "NotLessSlantEqual;", v: $toNativeArray($kindInt32, [10877, 824]) }, { k: "NotNestedGreaterGreater;", v: $toNativeArray($kindInt32, [10914, 824]) }, { k: "NotNestedLessLess;", v: $toNativeArray($kindInt32, [10913, 824]) }, { k: "NotPrecedesEqual;", v: $toNativeArray($kindInt32, [10927, 824]) }, { k: "NotRightTriangleBar;", v: $toNativeArray($kindInt32, [10704, 824]) }, { k: "NotSquareSubset;", v: $toNativeArray($kindInt32, [8847, 824]) }, { k: "NotSquareSuperset;", v: $toNativeArray($kindInt32, [8848, 824]) }, { k: "NotSubset;", v: $toNativeArray($kindInt32, [8834, 8402]) }, { k: "NotSucceedsEqual;", v: $toNativeArray($kindInt32, [10928, 824]) }, { k: "NotSucceedsTilde;", v: $toNativeArray($kindInt32, [8831, 824]) }, { k: "NotSuperset;", v: $toNativeArray($kindInt32, [8835, 8402]) }, { k: "ThickSpace;", v: $toNativeArray($kindInt32, [8287, 8202]) }, { k: "acE;", v: $toNativeArray($kindInt32, [8766, 819]) }, { k: "bne;", v: $toNativeArray($kindInt32, [61, 8421]) }, { k: "bnequiv;", v: $toNativeArray($kindInt32, [8801, 8421]) }, { k: "caps;", v: $toNativeArray($kindInt32, [8745, 65024]) }, { k: "cups;", v: $toNativeArray($kindInt32, [8746, 65024]) }, { k: "fjlig;", v: $toNativeArray($kindInt32, [102, 106]) }, { k: "gesl;", v: $toNativeArray($kindInt32, [8923, 65024]) }, { k: "gvertneqq;", v: $toNativeArray($kindInt32, [8809, 65024]) }, { k: "gvnE;", v: $toNativeArray($kindInt32, [8809, 65024]) }, { k: "lates;", v: $toNativeArray($kindInt32, [10925, 65024]) }, { k: "lesg;", v: $toNativeArray($kindInt32, [8922, 65024]) }, { k: "lvertneqq;", v: $toNativeArray($kindInt32, [8808, 65024]) }, { k: "lvnE;", v: $toNativeArray($kindInt32, [8808, 65024]) }, { k: "nGg;", v: $toNativeArray($kindInt32, [8921, 824]) }, { k: "nGtv;", v: $toNativeArray($kindInt32, [8811, 824]) }, { k: "nLl;", v: $toNativeArray($kindInt32, [8920, 824]) }, { k: "nLtv;", v: $toNativeArray($kindInt32, [8810, 824]) }, { k: "nang;", v: $toNativeArray($kindInt32, [8736, 8402]) }, { k: "napE;", v: $toNativeArray($kindInt32, [10864, 824]) }, { k: "napid;", v: $toNativeArray($kindInt32, [8779, 824]) }, { k: "nbump;", v: $toNativeArray($kindInt32, [8782, 824]) }, { k: "nbumpe;", v: $toNativeArray($kindInt32, [8783, 824]) }, { k: "ncongdot;", v: $toNativeArray($kindInt32, [10861, 824]) }, { k: "nedot;", v: $toNativeArray($kindInt32, [8784, 824]) }, { k: "nesim;", v: $toNativeArray($kindInt32, [8770, 824]) }, { k: "ngE;", v: $toNativeArray($kindInt32, [8807, 824]) }, { k: "ngeqq;", v: $toNativeArray($kindInt32, [8807, 824]) }, { k: "ngeqslant;", v: $toNativeArray($kindInt32, [10878, 824]) }, { k: "nges;", v: $toNativeArray($kindInt32, [10878, 824]) }, { k: "nlE;", v: $toNativeArray($kindInt32, [8806, 824]) }, { k: "nleqq;", v: $toNativeArray($kindInt32, [8806, 824]) }, { k: "nleqslant;", v: $toNativeArray($kindInt32, [10877, 824]) }, { k: "nles;", v: $toNativeArray($kindInt32, [10877, 824]) }, { k: "notinE;", v: $toNativeArray($kindInt32, [8953, 824]) }, { k: "notindot;", v: $toNativeArray($kindInt32, [8949, 824]) }, { k: "nparsl;", v: $toNativeArray($kindInt32, [11005, 8421]) }, { k: "npart;", v: $toNativeArray($kindInt32, [8706, 824]) }, { k: "npre;", v: $toNativeArray($kindInt32, [10927, 824]) }, { k: "npreceq;", v: $toNativeArray($kindInt32, [10927, 824]) }, { k: "nrarrc;", v: $toNativeArray($kindInt32, [10547, 824]) }, { k: "nrarrw;", v: $toNativeArray($kindInt32, [8605, 824]) }, { k: "nsce;", v: $toNativeArray($kindInt32, [10928, 824]) }, { k: "nsubE;", v: $toNativeArray($kindInt32, [10949, 824]) }, { k: "nsubset;", v: $toNativeArray($kindInt32, [8834, 8402]) }, { k: "nsubseteqq;", v: $toNativeArray($kindInt32, [10949, 824]) }, { k: "nsucceq;", v: $toNativeArray($kindInt32, [10928, 824]) }, { k: "nsupE;", v: $toNativeArray($kindInt32, [10950, 824]) }, { k: "nsupset;", v: $toNativeArray($kindInt32, [8835, 8402]) }, { k: "nsupseteqq;", v: $toNativeArray($kindInt32, [10950, 824]) }, { k: "nvap;", v: $toNativeArray($kindInt32, [8781, 8402]) }, { k: "nvge;", v: $toNativeArray($kindInt32, [8805, 8402]) }, { k: "nvgt;", v: $toNativeArray($kindInt32, [62, 8402]) }, { k: "nvle;", v: $toNativeArray($kindInt32, [8804, 8402]) }, { k: "nvlt;", v: $toNativeArray($kindInt32, [60, 8402]) }, { k: "nvltrie;", v: $toNativeArray($kindInt32, [8884, 8402]) }, { k: "nvrtrie;", v: $toNativeArray($kindInt32, [8885, 8402]) }, { k: "nvsim;", v: $toNativeArray($kindInt32, [8764, 8402]) }, { k: "race;", v: $toNativeArray($kindInt32, [8765, 817]) }, { k: "smtes;", v: $toNativeArray($kindInt32, [10924, 65024]) }, { k: "sqcaps;", v: $toNativeArray($kindInt32, [8851, 65024]) }, { k: "sqcups;", v: $toNativeArray($kindInt32, [8852, 65024]) }, { k: "varsubsetneq;", v: $toNativeArray($kindInt32, [8842, 65024]) }, { k: "varsubsetneqq;", v: $toNativeArray($kindInt32, [10955, 65024]) }, { k: "varsupsetneq;", v: $toNativeArray($kindInt32, [8843, 65024]) }, { k: "varsupsetneqq;", v: $toNativeArray($kindInt32, [10956, 65024]) }, { k: "vnsub;", v: $toNativeArray($kindInt32, [8834, 8402]) }, { k: "vnsup;", v: $toNativeArray($kindInt32, [8835, 8402]) }, { k: "vsubnE;", v: $toNativeArray($kindInt32, [10955, 65024]) }, { k: "vsubne;", v: $toNativeArray($kindInt32, [8842, 65024]) }, { k: "vsupnE;", v: $toNativeArray($kindInt32, [10956, 65024]) }, { k: "vsupne;", v: $toNativeArray($kindInt32, [8843, 65024]) }]);
+		replacementTable = $toNativeArray($kindInt32, [8364, 129, 8218, 402, 8222, 8230, 8224, 8225, 710, 8240, 352, 8249, 338, 141, 381, 143, 144, 8216, 8217, 8220, 8221, 8226, 8211, 8212, 732, 8482, 353, 8250, 339, 157, 382, 376]);
+		breakout = $makeMap($String.keyFor, [{ k: "b", v: true }, { k: "big", v: true }, { k: "blockquote", v: true }, { k: "body", v: true }, { k: "br", v: true }, { k: "center", v: true }, { k: "code", v: true }, { k: "dd", v: true }, { k: "div", v: true }, { k: "dl", v: true }, { k: "dt", v: true }, { k: "em", v: true }, { k: "embed", v: true }, { k: "h1", v: true }, { k: "h2", v: true }, { k: "h3", v: true }, { k: "h4", v: true }, { k: "h5", v: true }, { k: "h6", v: true }, { k: "head", v: true }, { k: "hr", v: true }, { k: "i", v: true }, { k: "img", v: true }, { k: "li", v: true }, { k: "listing", v: true }, { k: "menu", v: true }, { k: "meta", v: true }, { k: "nobr", v: true }, { k: "ol", v: true }, { k: "p", v: true }, { k: "pre", v: true }, { k: "ruby", v: true }, { k: "s", v: true }, { k: "small", v: true }, { k: "span", v: true }, { k: "strong", v: true }, { k: "strike", v: true }, { k: "sub", v: true }, { k: "sup", v: true }, { k: "table", v: true }, { k: "tt", v: true }, { k: "u", v: true }, { k: "ul", v: true }, { k: "var", v: true }]);
+		svgTagNameAdjustments = $makeMap($String.keyFor, [{ k: "altglyph", v: "altGlyph" }, { k: "altglyphdef", v: "altGlyphDef" }, { k: "altglyphitem", v: "altGlyphItem" }, { k: "animatecolor", v: "animateColor" }, { k: "animatemotion", v: "animateMotion" }, { k: "animatetransform", v: "animateTransform" }, { k: "clippath", v: "clipPath" }, { k: "feblend", v: "feBlend" }, { k: "fecolormatrix", v: "feColorMatrix" }, { k: "fecomponenttransfer", v: "feComponentTransfer" }, { k: "fecomposite", v: "feComposite" }, { k: "feconvolvematrix", v: "feConvolveMatrix" }, { k: "fediffuselighting", v: "feDiffuseLighting" }, { k: "fedisplacementmap", v: "feDisplacementMap" }, { k: "fedistantlight", v: "feDistantLight" }, { k: "feflood", v: "feFlood" }, { k: "fefunca", v: "feFuncA" }, { k: "fefuncb", v: "feFuncB" }, { k: "fefuncg", v: "feFuncG" }, { k: "fefuncr", v: "feFuncR" }, { k: "fegaussianblur", v: "feGaussianBlur" }, { k: "feimage", v: "feImage" }, { k: "femerge", v: "feMerge" }, { k: "femergenode", v: "feMergeNode" }, { k: "femorphology", v: "feMorphology" }, { k: "feoffset", v: "feOffset" }, { k: "fepointlight", v: "fePointLight" }, { k: "fespecularlighting", v: "feSpecularLighting" }, { k: "fespotlight", v: "feSpotLight" }, { k: "fetile", v: "feTile" }, { k: "feturbulence", v: "feTurbulence" }, { k: "foreignobject", v: "foreignObject" }, { k: "glyphref", v: "glyphRef" }, { k: "lineargradient", v: "linearGradient" }, { k: "radialgradient", v: "radialGradient" }, { k: "textpath", v: "textPath" }]);
+		mathMLAttributeAdjustments = $makeMap($String.keyFor, [{ k: "definitionurl", v: "definitionURL" }]);
+		svgAttributeAdjustments = $makeMap($String.keyFor, [{ k: "attributename", v: "attributeName" }, { k: "attributetype", v: "attributeType" }, { k: "basefrequency", v: "baseFrequency" }, { k: "baseprofile", v: "baseProfile" }, { k: "calcmode", v: "calcMode" }, { k: "clippathunits", v: "clipPathUnits" }, { k: "contentscripttype", v: "contentScriptType" }, { k: "contentstyletype", v: "contentStyleType" }, { k: "diffuseconstant", v: "diffuseConstant" }, { k: "edgemode", v: "edgeMode" }, { k: "externalresourcesrequired", v: "externalResourcesRequired" }, { k: "filterres", v: "filterRes" }, { k: "filterunits", v: "filterUnits" }, { k: "glyphref", v: "glyphRef" }, { k: "gradienttransform", v: "gradientTransform" }, { k: "gradientunits", v: "gradientUnits" }, { k: "kernelmatrix", v: "kernelMatrix" }, { k: "kernelunitlength", v: "kernelUnitLength" }, { k: "keypoints", v: "keyPoints" }, { k: "keysplines", v: "keySplines" }, { k: "keytimes", v: "keyTimes" }, { k: "lengthadjust", v: "lengthAdjust" }, { k: "limitingconeangle", v: "limitingConeAngle" }, { k: "markerheight", v: "markerHeight" }, { k: "markerunits", v: "markerUnits" }, { k: "markerwidth", v: "markerWidth" }, { k: "maskcontentunits", v: "maskContentUnits" }, { k: "maskunits", v: "maskUnits" }, { k: "numoctaves", v: "numOctaves" }, { k: "pathlength", v: "pathLength" }, { k: "patterncontentunits", v: "patternContentUnits" }, { k: "patterntransform", v: "patternTransform" }, { k: "patternunits", v: "patternUnits" }, { k: "pointsatx", v: "pointsAtX" }, { k: "pointsaty", v: "pointsAtY" }, { k: "pointsatz", v: "pointsAtZ" }, { k: "preservealpha", v: "preserveAlpha" }, { k: "preserveaspectratio", v: "preserveAspectRatio" }, { k: "primitiveunits", v: "primitiveUnits" }, { k: "refx", v: "refX" }, { k: "refy", v: "refY" }, { k: "repeatcount", v: "repeatCount" }, { k: "repeatdur", v: "repeatDur" }, { k: "requiredextensions", v: "requiredExtensions" }, { k: "requiredfeatures", v: "requiredFeatures" }, { k: "specularconstant", v: "specularConstant" }, { k: "specularexponent", v: "specularExponent" }, { k: "spreadmethod", v: "spreadMethod" }, { k: "startoffset", v: "startOffset" }, { k: "stddeviation", v: "stdDeviation" }, { k: "stitchtiles", v: "stitchTiles" }, { k: "surfacescale", v: "surfaceScale" }, { k: "systemlanguage", v: "systemLanguage" }, { k: "tablevalues", v: "tableValues" }, { k: "targetx", v: "targetX" }, { k: "targety", v: "targetY" }, { k: "textlength", v: "textLength" }, { k: "viewbox", v: "viewBox" }, { k: "viewtarget", v: "viewTarget" }, { k: "xchannelselector", v: "xChannelSelector" }, { k: "ychannelselector", v: "yChannelSelector" }, { k: "zoomandpan", v: "zoomAndPan" }]);
+		scopeMarker = new Node.ptr(ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, ptrType.nil, 6, 0, "", "", sliceType$1.nil);
+		defaultScopeStopTags = $makeMap($String.keyFor, [{ k: "", v: new sliceType$2([203014, 143623, 22020, 365829, 37378, 87554, 206599, 157702, 463880]) }, { k: "math", v: new sliceType$2([117006, 214786, 176386, 41986, 422914, 217349]) }, { k: "svg", v: new sliceType$2([352516, 152589, 69637]) }]);
+		plaintextAbort = errors.New("html: internal error (plaintext abort)");
+		$pkg.ErrBufferExceeded = errors.New("max buffer exceeded");
+		nul = (new sliceType$3($stringToBytes("\x00")));
+		replacement = (new sliceType$3($stringToBytes("\xEF\xBF\xBD")));
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["github.com/tvastar/htmltables"] = (function() {
+	var $pkg = {}, $init, html, atom, strconv, strings, Table, ptrType, sliceType, ptrType$1, ptrType$2, sliceType$1, sliceType$2, mapType, Parse, innerText, parse, addMissingColumns;
+	html = $packages["golang.org/x/net/html"];
+	atom = $packages["golang.org/x/net/html/atom"];
+	strconv = $packages["strconv"];
+	strings = $packages["strings"];
+	Table = $pkg.Table = $newType(0, $kindStruct, "htmltables.Table", true, "github.com/tvastar/htmltables", true, function(Attributes_, Headers_, Rows_) {
+		this.$val = this;
+		if (arguments.length === 0) {
+			this.Attributes = false;
+			this.Headers = sliceType$1.nil;
+			this.Rows = sliceType$2.nil;
+			return;
+		}
+		this.Attributes = Attributes_;
+		this.Headers = Headers_;
+		this.Rows = Rows_;
+	});
+	ptrType = $ptrType(Table);
+	sliceType = $sliceType(ptrType);
+	ptrType$1 = $ptrType(sliceType);
+	ptrType$2 = $ptrType(html.Node);
+	sliceType$1 = $sliceType($String);
+	sliceType$2 = $sliceType(sliceType$1);
+	mapType = $mapType($String, $String);
+	Parse = function(s) {
+		var _i, _r, _ref, _tuple, err, kk, node, s, t, tables, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _i = $f._i; _r = $f._r; _ref = $f._ref; _tuple = $f._tuple; err = $f.err; kk = $f.kk; node = $f.node; s = $f.s; t = $f.t; tables = $f.tables; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		tables = [tables];
+		_r = html.Parse(strings.NewReader(s)); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_tuple = _r;
+		node = _tuple[0];
+		err = _tuple[1];
+		if (!($interfaceIsEqual(err, $ifaceNil))) {
+			$s = -1; return [sliceType.nil, err];
+		}
+		tables[0] = new sliceType([]);
+		$r = parse(node, (tables.$ptr || (tables.$ptr = new ptrType$1(function() { return this.$target[0]; }, function($v) { this.$target[0] = $v; }, tables)))); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		_ref = tables[0];
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			kk = _i;
+			t = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			((kk < 0 || kk >= tables[0].$length) ? ($throwRuntimeError("index out of range"), undefined) : tables[0].$array[tables[0].$offset + kk] = addMissingColumns(t));
+			_i++;
+		}
+		$s = -1; return [tables[0], $ifaceNil];
+		/* */ } return; } if ($f === undefined) { $f = { $blk: Parse }; } $f._i = _i; $f._r = _r; $f._ref = _ref; $f._tuple = _tuple; $f.err = err; $f.kk = kk; $f.node = node; $f.s = s; $f.t = t; $f.tables = tables; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.Parse = Parse;
+	innerText = function(n) {
+		var n, result, x;
+		if (n.Type === 1) {
+			return n.Data;
+		}
+		result = "";
+		x = n.FirstChild;
+		while (true) {
+			if (!(!(x === ptrType$2.nil))) { break; }
+			result = result + (innerText(x));
+			x = x.NextSibling;
+		}
+		return result;
+	};
+	parse = function(n, tables) {
+		var _1, _i, _key, _r, _r$1, _ref, at, child, l, n, strip, t, t$1, t$2, t$3, tables, x, x$1, x$2, x$3, x$4, x$5, x$6, x$7, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _1 = $f._1; _i = $f._i; _key = $f._key; _r = $f._r; _r$1 = $f._r$1; _ref = $f._ref; at = $f.at; child = $f.child; l = $f.l; n = $f.n; strip = $f.strip; t = $f.t; t$1 = $f.t$1; t$2 = $f.t$2; t$3 = $f.t$3; tables = $f.tables; x = $f.x; x$1 = $f.x$1; x$2 = $f.x$2; x$3 = $f.x$3; x$4 = $f.x$4; x$5 = $f.x$5; x$6 = $f.x$6; x$7 = $f.x$7; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		strip = strings.TrimSpace;
+			_1 = n.DataAtom;
+			/* */ if (_1 === (365829)) { $s = 2; continue; }
+			/* */ if (_1 === (87554)) { $s = 3; continue; }
+			/* */ if (_1 === (52226)) { $s = 4; continue; }
+			/* */ if (_1 === (37378)) { $s = 5; continue; }
+			/* */ $s = 6; continue;
+			/* if (_1 === (365829)) { */ case 2:
+				t = new Table.ptr(false, sliceType$1.nil, sliceType$2.nil);
+				_ref = n.Attr;
+				_i = 0;
+				while (true) {
+					if (!(_i < _ref.$length)) { break; }
+					at = $clone(((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]), html.Attribute);
+					if (t.Attributes === false) {
+						t.Attributes = $makeMap($String.keyFor, []);
+					}
+					_key = at.Key; (t.Attributes || $throwRuntimeError("assignment to entry in nil map"))[$String.keyFor(_key)] = { k: _key, v: at.Val };
+					_i++;
+				}
+				tables.$set($append(tables.$get(), t));
+				$s = 6; continue;
+			/* } else if (_1 === (87554)) { */ case 3:
+				t$1 = (x = tables.$get(), x$1 = tables.$get().$length - 1 >> 0, ((x$1 < 0 || x$1 >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + x$1]));
+				_r = strip(innerText(n)); /* */ $s = 7; case 7: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+				t$1.Headers = $append(t$1.Headers, _r);
+				$s = 6; continue;
+			/* } else if (_1 === (52226)) { */ case 4:
+				t$2 = (x$2 = tables.$get(), x$3 = tables.$get().$length - 1 >> 0, ((x$3 < 0 || x$3 >= x$2.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$2.$array[x$2.$offset + x$3]));
+				t$2.Rows = $append(t$2.Rows, new sliceType$1([]));
+				$s = 6; continue;
+			/* } else if (_1 === (37378)) { */ case 5:
+				t$3 = (x$4 = tables.$get(), x$5 = tables.$get().$length - 1 >> 0, ((x$5 < 0 || x$5 >= x$4.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$4.$array[x$4.$offset + x$5]));
+				l = t$3.Rows.$length - 1 >> 0;
+				_r$1 = strip(innerText(n)); /* */ $s = 8; case 8: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+				(x$7 = t$3.Rows, ((l < 0 || l >= x$7.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$7.$array[x$7.$offset + l] = $append((x$6 = t$3.Rows, ((l < 0 || l >= x$6.$length) ? ($throwRuntimeError("index out of range"), undefined) : x$6.$array[x$6.$offset + l])), _r$1)));
+				$s = -1; return;
+			/* } */ case 6:
+		case 1:
+		child = n.FirstChild;
+		/* while (true) { */ case 9:
+			/* if (!(!(child === ptrType$2.nil))) { break; } */ if(!(!(child === ptrType$2.nil))) { $s = 10; continue; }
+			$r = parse(child, tables); /* */ $s = 11; case 11: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+			child = child.NextSibling;
+		/* } */ $s = 9; continue; case 10:
+		$s = -1; return;
+		/* */ } return; } if ($f === undefined) { $f = { $blk: parse }; } $f._1 = _1; $f._i = _i; $f._key = _key; $f._r = _r; $f._r$1 = _r$1; $f._ref = _ref; $f.at = at; $f.child = child; $f.l = l; $f.n = n; $f.strip = strip; $f.t = t; $f.t$1 = t$1; $f.t$2 = t$2; $f.t$3 = t$3; $f.tables = tables; $f.x = x; $f.x$1 = x$1; $f.x$2 = x$2; $f.x$3 = x$3; $f.x$4 = x$4; $f.x$5 = x$5; $f.x$6 = x$6; $f.x$7 = x$7; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	addMissingColumns = function(t) {
+		var _i, _i$1, _ref, _ref$1, cols, kk, name, row, rows, t;
+		cols = t.Headers.$length;
+		rows = $makeSlice(sliceType$2, 0, t.Rows.$length);
+		_ref = t.Rows;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			row = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (row.$length > 0) {
+				rows = $append(rows, row);
+			}
+			if (row.$length > cols) {
+				cols = row.$length;
+			}
+			_i++;
+		}
+		while (true) {
+			if (!(t.Headers.$length < cols)) { break; }
+			name = "Col " + strconv.Itoa(t.Headers.$length + 1 >> 0);
+			t.Headers = $append(t.Headers, name);
+		}
+		_ref$1 = rows;
+		_i$1 = 0;
+		while (true) {
+			if (!(_i$1 < _ref$1.$length)) { break; }
+			kk = _i$1;
+			while (true) {
+				if (!(((kk < 0 || kk >= rows.$length) ? ($throwRuntimeError("index out of range"), undefined) : rows.$array[rows.$offset + kk]).$length < cols)) { break; }
+				((kk < 0 || kk >= rows.$length) ? ($throwRuntimeError("index out of range"), undefined) : rows.$array[rows.$offset + kk] = $append(((kk < 0 || kk >= rows.$length) ? ($throwRuntimeError("index out of range"), undefined) : rows.$array[rows.$offset + kk]), ""));
+			}
+			_i$1++;
+		}
+		t.Rows = rows;
+		return t;
+	};
+	Table.init("", [{prop: "Attributes", name: "Attributes", anonymous: false, exported: true, typ: mapType, tag: ""}, {prop: "Headers", name: "Headers", anonymous: false, exported: true, typ: sliceType$1, tag: ""}, {prop: "Rows", name: "Rows", anonymous: false, exported: true, typ: sliceType$2, tag: ""}]);
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = html.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = atom.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strconv.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strings.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
+$packages["github.com/funnelorg/funnel/wiki"] = (function() {
+	var $pkg = {}, $init, builtin, data, run, url, htmltables, strconv, strings, mapType, sliceType, sliceType$1, sliceType$2, mapType$1, sliceType$3, Scope, tablesf, wikiTables, jsonPath, escape, shouldNotEncode, format, formatCell, getTable;
+	builtin = $packages["github.com/funnelorg/funnel/builtin"];
+	data = $packages["github.com/funnelorg/funnel/data"];
+	run = $packages["github.com/funnelorg/funnel/run"];
+	url = $packages["github.com/funnelorg/funnel/url"];
+	htmltables = $packages["github.com/tvastar/htmltables"];
+	strconv = $packages["strconv"];
+	strings = $packages["strings"];
+	mapType = $mapType($emptyInterface, $emptyInterface);
+	sliceType = $sliceType(mapType);
+	sliceType$1 = $sliceType($Uint8);
+	sliceType$2 = $sliceType($String);
+	mapType$1 = $mapType($String, $emptyInterface);
+	sliceType$3 = $sliceType($emptyInterface);
+	Scope = function(base) {
+		var base;
+		return run.NewScope(new sliceType([$pkg.Map]), base);
+	};
+	$pkg.Scope = Scope;
+	tablesf = function(args) {
+		var _r, _ref, args, f, f$1, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _ref = $f._ref; args = $f.args; f = $f.f; f$1 = $f.f$1; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		if (!((args.$length === 1))) {
+			$s = -1; return new run.ErrorStack.ptr("wiki:tables: requires exactly 1 arg", "", 0, $ifaceNil);
+		}
+		_ref = (0 >= args.$length ? ($throwRuntimeError("index out of range"), undefined) : args.$array[args.$offset + 0]);
+		/* */ if ($assertType(_ref, $String, true)[1]) { $s = 1; continue; }
+		/* */ if ($assertType(_ref, $error, true)[1]) { $s = 2; continue; }
+		/* */ $s = 3; continue;
+		/* if ($assertType(_ref, $String, true)[1]) { */ case 1:
+			f = _ref.$val;
+			_r = wikiTables(f); /* */ $s = 4; case 4: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+			$s = -1; return _r;
+		/* } else if ($assertType(_ref, $error, true)[1]) { */ case 2:
+			f$1 = _ref;
+			$s = -1; return f$1;
+		/* } */ case 3:
+		$s = -1; return new run.ErrorStack.ptr("wiki:tables: not a string", "", 0, $ifaceNil);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: tablesf }; } $f._r = _r; $f._ref = _ref; $f.args = args; $f.f = f; $f.f$1 = f$1; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	wikiTables = function(name) {
+		var _r, _r$1, _tuple, _tuple$1, _tuple$2, err, json, name, prefix, tables, text, u, $s, $r;
+		/* */ $s = 0; var $f, $c = false; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; _r = $f._r; _r$1 = $f._r$1; _tuple = $f._tuple; _tuple$1 = $f._tuple$1; _tuple$2 = $f._tuple$2; err = $f.err; json = $f.json; name = $f.name; prefix = $f.prefix; tables = $f.tables; text = $f.text; u = $f.u; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		prefix = "https://en.wikipedia.org/w/api.php?action=parse&format=json&page=";
+		u = (prefix + escape((new sliceType$1($stringToBytes(name)))) + "&origin=*");
+		_r = new url.URL(u).Fetch("json"); /* */ $s = 1; case 1: if($c) { $c = false; _r = _r.$blk(); } if (_r && _r.$blk !== undefined) { break s; }
+		_tuple = _r;
+		json = _tuple[0];
+		err = _tuple[1];
+		if (!($interfaceIsEqual(err, $ifaceNil))) {
+			$s = -1; return new run.ErrorStack.ptr("wiki:tables fetch error", "", 0, err);
+		}
+		_tuple$1 = jsonPath(json, new sliceType$2(["parse", "text", "*"]));
+		text = _tuple$1[0];
+		err = _tuple$1[1];
+		if (!($interfaceIsEqual(err, $ifaceNil))) {
+			$s = -1; return err;
+		}
+		_r$1 = htmltables.Parse(text); /* */ $s = 2; case 2: if($c) { $c = false; _r$1 = _r$1.$blk(); } if (_r$1 && _r$1.$blk !== undefined) { break s; }
+		_tuple$2 = _r$1;
+		tables = _tuple$2[0];
+		err = _tuple$2[1];
+		if ($interfaceIsEqual(err, $ifaceNil) && tables.$length > 0) {
+			$s = -1; return format(getTable(tables));
+		}
+		$s = -1; return new run.ErrorStack.ptr("wiki:tables parse error", "", 0, err);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: wikiTables }; } $f._r = _r; $f._r$1 = _r$1; $f._tuple = _tuple; $f._tuple$1 = _tuple$1; $f._tuple$2 = _tuple$2; $f.err = err; $f.json = json; $f.name = name; $f.prefix = prefix; $f.tables = tables; $f.text = text; $f.u = u; $f.$s = $s; $f.$r = $r; return $f;
+	};
+	jsonPath = function(json, keys) {
+		var _entry, _tuple, _tuple$1, json, keys, mm, ok, ok$1, text;
+		if (keys.$length === 0) {
+			_tuple = $assertType(json, $String, true);
+			text = _tuple[0];
+			ok = _tuple[1];
+			if (!ok) {
+				return ["", new run.ErrorStack.ptr("Parse failure: not a string", "", 0, $ifaceNil)];
+			}
+			return [text, $ifaceNil];
+		}
+		_tuple$1 = $assertType(json, mapType$1, true);
+		mm = _tuple$1[0];
+		ok$1 = _tuple$1[1];
+		if (!ok$1) {
+			return ["", new run.ErrorStack.ptr("Parse failure: " + (0 >= keys.$length ? ($throwRuntimeError("index out of range"), undefined) : keys.$array[keys.$offset + 0]), "", 0, $ifaceNil)];
+		}
+		return jsonPath((_entry = mm[$String.keyFor((0 >= keys.$length ? ($throwRuntimeError("index out of range"), undefined) : keys.$array[keys.$offset + 0]))], _entry !== undefined ? _entry.v : $ifaceNil), $subslice(keys, 1));
+	};
+	escape = function(b) {
+		var _i, _ref, b, c, result;
+		result = $makeSlice(sliceType$1, 0, b.$length);
+		_ref = b;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			c = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (c === 32) {
+				result = $append(result, 43);
+			} else if (shouldNotEncode(c)) {
+				result = $append(result, c);
+			} else {
+				result = $append(result, 37);
+				result = $append(result, "0123456789ABCDEF".charCodeAt((c >>> 4 << 24 >>> 24)));
+				result = $append(result, "0123456789ABCDEF".charCodeAt(((c & 15) >>> 0)));
+			}
+			_i++;
+		}
+		return ($bytesToString(result));
+	};
+	shouldNotEncode = function(c) {
+		var c;
+		return 65 <= c && c <= 90 || 97 <= c && c <= 122 || 48 <= c && c <= 57 || (c === 45) || (c === 95) || (c === 46) || (c === 126);
+	};
+	format = function(t) {
+		var _i, _i$1, _key, _ref, _ref$1, entry, kk, result, row, t, x;
+		result = new sliceType$3([]);
+		_ref = t.Rows;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			row = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			entry = $makeMap($String.keyFor, []);
+			_ref$1 = t.Headers;
+			_i$1 = 0;
+			while (true) {
+				if (!(_i$1 < _ref$1.$length)) { break; }
+				kk = _i$1;
+				_key = (x = t.Headers, ((kk < 0 || kk >= x.$length) ? ($throwRuntimeError("index out of range"), undefined) : x.$array[x.$offset + kk])); (entry || $throwRuntimeError("assignment to entry in nil map"))[$String.keyFor(_key)] = { k: _key, v: formatCell(((kk < 0 || kk >= row.$length) ? ($throwRuntimeError("index out of range"), undefined) : row.$array[row.$offset + kk])) };
+				_i$1++;
+			}
+			result = $append(result, new mapType$1(entry));
+			_i++;
+		}
+		return data.Wrap(result);
+	};
+	formatCell = function(s) {
+		var _tuple, err, s, x, x$1;
+		_tuple = strconv.ParseFloat(strings.Replace(s, ",", "", 10), 64);
+		x = _tuple[0];
+		err = _tuple[1];
+		if ($interfaceIsEqual(err, $ifaceNil)) {
+			return (x$1 = new builtin.Number.ptr(x), new x$1.constructor.elem(x$1));
+		}
+		return new $String(s);
+	};
+	getTable = function(tables) {
+		var _entry, _i, _ref, table, tables;
+		_ref = tables;
+		_i = 0;
+		while (true) {
+			if (!(_i < _ref.$length)) { break; }
+			table = ((_i < 0 || _i >= _ref.$length) ? ($throwRuntimeError("index out of range"), undefined) : _ref.$array[_ref.$offset + _i]);
+			if (strings.Contains((_entry = table.Attributes[$String.keyFor("class")], _entry !== undefined ? _entry.v : ""), "wikitable")) {
+				return table;
+			}
+			_i++;
+		}
+		return (0 >= tables.$length ? ($throwRuntimeError("index out of range"), undefined) : tables.$array[tables.$offset + 0]);
+	};
+	$init = function() {
+		$pkg.$init = function() {};
+		/* */ var $f, $c = false, $s = 0, $r; if (this !== undefined && this.$blk !== undefined) { $f = this; $c = true; $s = $f.$s; $r = $f.$r; } s: while (true) { switch ($s) { case 0:
+		$r = builtin.$init(); /* */ $s = 1; case 1: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = data.$init(); /* */ $s = 2; case 2: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = run.$init(); /* */ $s = 3; case 3: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = url.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = htmltables.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strconv.$init(); /* */ $s = 6; case 6: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = strings.$init(); /* */ $s = 7; case 7: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$pkg.Map = $makeMap($emptyInterface.keyFor, [{ k: new $String("wiki:table"), v: new run.ArgsResolver((tablesf)) }]);
+		/* */ } return; } if ($f === undefined) { $f = { $blk: $init }; } $f.$s = $s; $f.$r = $r; return $f;
+	};
+	$pkg.$init = $init;
+	return $pkg;
+})();
 $packages["github.com/funnelorg/playground"] = (function() {
-	var $pkg = {}, $init, funnel, builtin, code, data, math, url, js, stackable, scopeWithKeys, mapType, funcType, funcType$1, mapType$1, funcType$2, s, Eval, format, main;
+	var $pkg = {}, $init, funnel, builtin, code, data, math, url, wiki, js, stackable, scopeWithKeys, mapType, funcType, funcType$1, mapType$1, funcType$2, s, Eval, format, main;
 	funnel = $packages["github.com/funnelorg/funnel"];
 	builtin = $packages["github.com/funnelorg/funnel/builtin"];
 	code = $packages["github.com/funnelorg/funnel/code"];
 	data = $packages["github.com/funnelorg/funnel/data"];
 	math = $packages["github.com/funnelorg/funnel/math"];
 	url = $packages["github.com/funnelorg/funnel/url"];
+	wiki = $packages["github.com/funnelorg/funnel/wiki"];
 	js = $packages["github.com/gopherjs/gopherjs/js"];
 	stackable = $pkg.stackable = $newType(8, $kindInterface, "main.stackable", true, "github.com/funnelorg/playground", false, null);
 	scopeWithKeys = $pkg.scopeWithKeys = $newType(8, $kindInterface, "main.scopeWithKeys", true, "github.com/funnelorg/playground", false, null);
@@ -25424,8 +31459,9 @@ $packages["github.com/funnelorg/playground"] = (function() {
 		$r = data.$init(); /* */ $s = 4; case 4: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = math.$init(); /* */ $s = 5; case 5: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
 		$r = url.$init(); /* */ $s = 6; case 6: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		$r = js.$init(); /* */ $s = 7; case 7: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
-		s = code.Scope(data.Scope(url.Scope(math.Scope(builtin.Scope))));
+		$r = wiki.$init(); /* */ $s = 7; case 7: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		$r = js.$init(); /* */ $s = 8; case 8: if($c) { $c = false; $r = $r.$blk(); } if ($r && $r.$blk !== undefined) { break s; }
+		s = wiki.Scope(code.Scope(data.Scope(url.Scope(math.Scope(builtin.Scope)))));
 		if ($pkg === $mainPkg) {
 			main();
 			$mainFinished = true;
