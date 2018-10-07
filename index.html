@@ -108,6 +108,7 @@
           <button>&#9654; Run</button> <span class="output">Output</span>
         </div>
       </div>
+	    
       <p> Similar to <code>data:list</code>, there is also <code>data:map</code>: </p>
       <div class="snippet">
         <div class="code">data:map{x = 2}.map(value * 2)</div>
@@ -115,6 +116,7 @@
           <button>&#9654; Run</button> <span class="output">Output</span>
         </div>
       </div>
+	    
       <p> Both <code>data:list</code> and <code>data:map</code> expose <code>filterf</code> and <code>mapf</code> functions which takes a <i>function</i> as an argument rather than an <i>expression</i>.  These are good for nested use cases:
       <div class="snippet">
         <div class="code">data:list(data:list(1)).map(value.mapf(fun(i,v, v * index)))</div>
@@ -122,6 +124,7 @@
           <button>&#9654; Run</button> <span class="output">Output</span>
         </div>
       </div>
+	    
       <p> Importing code from a url: </p>
       <div class="snippet">
         <div class="code">code:import(string "https://raw.githubusercontent.com/funnelorg/funnel/master/x/tests/simple.fun")</div>
