@@ -34,9 +34,18 @@
         border-radius: 0;
         background: rgb(255,230,230);
       }
+      .hide {
+        display: none
+      }
     </style>
   </head>
-  <div>
+  <div class="gist hide">
+    <h2>Gist</h2>
+    <div class="wrapper">
+        <button>&#9654; Run</button> <span class="output">Output</span>
+    </div>
+  </div>
+  <div class="examples">    
     <h2>Funnel Playground</h2>
     <p> Type your funnel code in here: </p>
     <div class="snippet">
@@ -45,6 +54,11 @@
         <button>&#9654; Run</button> <span class="output">Output</span>
       </div>
     </div>
+    <h3>Loading gists</h3>
+    <p>The playground url can load gists and run them. For example, consider the gist
+      url <a href="https://gist.github.com/rameshvk/73617b4fb991ab410df7f830ec086511">https://git.github.com/rameshvk/73617b4fb991ab410df7f830ec086511</a>.
+    This can be accessed like so: <a href="?gist=https://gist.githubusercontent.com/rameshvk/73617b4fb991ab410df7f830ec086511/raw/20afbbed159895c256eaead582493ca47852b5fc/test.fun">https://github.com/funnelorg/playground?gist=https://gist.githubusercontent.com/rameshvk/73617b4fb991ab410df7f830ec086511/raw/20afbbed159895c256eaead582493ca47852b5fc/test.fun</a></p>
+    
     <h3>Features</h3>
       <ul>
         <li>Infix expressions: <code>x + y()</code></li>
@@ -57,6 +71,7 @@
         <li>Importing code from url: <code>code:import(string "...")</code></li>
         <li>Fetching wikipedia tables: <code>wiki:table(string "...")</code></li>
       </ul>
+
     <h3> Examples </h3>
     <div>
       <p> Funnel expresions can include the standard binary operators: <code>+-/*</code></p>
